@@ -1,0 +1,14 @@
+{
+  "name": "iso8583-tooling",
+  "version": "0.1.0",
+  "description": "ISO 8583:1993 Message Parser & Visualizer",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

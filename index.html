@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ISO 8583 Tooling</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-inner">
+        <h1>ISO 8583 Tooling</h1>
+        <p class="subtitle">ISO 8583:1993 Message Parser &amp; Visualizer</p>
+      </div>
+    </header>
+
+    <main>
+      <!-- Input Section -->
+      <section class="card input-section">
+        <h2>Input</h2>
+        <label for="hexInput">Raw ISO 8583 Hex Message</label>
+        <textarea
+          id="hexInput"
+          placeholder="Paste your ISO 8583 hex-encoded message here…"
+          rows="5"
+          spellcheck="false"
+        ></textarea>
+
+        <div class="options-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="skipHeader" />
+            Skip length header (first
+            <input
+              type="number"
+              id="skipBytes"
+              value="2"
+              min="0"
+              max="8"
+              style="width: 3.5rem"
+            />
+            bytes)
+          </label>
+        </div>
+
+        <div class="button-row">
+          <button id="btnParse" class="btn btn-primary">Parse Message</button>
+          <button id="btnSample" class="btn btn-secondary">Load Sample</button>
+          <button id="btnClear" class="btn btn-secondary">Clear</button>
+        </div>
+      </section>
+
+      <!-- Output Section -->
+      <section id="outputSection" class="card output-section hidden">
+        <div id="errorBanner" class="error-banner hidden"></div>
+
+        <div class="summary-row">
+          <div class="summary-item">
+            <span class="label">MTI</span>
+            <span id="mtiValue" class="badge badge-mti"></span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Primary Bitmap</span>
+            <code id="primaryBitmapValue" class="mono"></code>
+          </div>
+          <div id="secondaryBitmapItem" class="summary-item hidden">
+            <span class="label">Secondary Bitmap</span>
+            <code id="secondaryBitmapValue" class="mono"></code>
+          </div>
+          <div class="summary-item">
+            <span class="label">Fields Present</span>
+            <span id="fieldCount" class="badge badge-count"></span>
+          </div>
+        </div>
+
+        <div class="output-actions">
+          <button id="btnExport" class="btn btn-primary">Export JSON</button>
+        </div>
+
+        <div id="tableContainer"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>ISO 8583:1993 &mdash; built with Vanilla JS &amp; Vite</p>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
