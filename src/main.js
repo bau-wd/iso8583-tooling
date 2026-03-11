@@ -1,6 +1,7 @@
 import { parseISO8583 } from './parser.js';
 import { renderMessage } from './renderer.js';
 import { downloadJSON, copyJSONToClipboard } from './exporter.js';
+import { buildHexFromJSON, readJSONFile } from './importer.js';
 
 // ── Sample 0200 Authorization Request ────────────────────────────────────────
 //
@@ -63,6 +64,8 @@ const btnSample     = document.getElementById('btnSample');
 const btnClear      = document.getElementById('btnClear');
 const btnExport     = document.getElementById('btnExport');
 const btnCopy       = document.getElementById('btnCopy');
+const btnImport     = document.getElementById('btnImport');
+const importFileInput = document.getElementById('importFileInput');
 const outputSection = document.getElementById('outputSection');
 const mtiValue      = document.getElementById('mtiValue');
 const primaryBitmapValue   = document.getElementById('primaryBitmapValue');
@@ -133,6 +136,28 @@ btnClear.addEventListener('click', () => {
   outputSection.classList.add('hidden');
   lastParsed = null;
   hexInput.focus();
+});
+
+btnImport.addEventListener('click', () => {
+  importFileInput.value = ''; // reset so re-selecting same file triggers change
+  importFileInput.click();
+});
+
+importFileInput.addEventListener('change', async () => {
+  const file = importFileInput.files[0];
+  if (!file) return;
+
+  try {
+    const json = await readJSONFile(file);
+    const hex  = buildHexFromJSON(json);
+    hexInput.value = hex;
+    skipHeader.checked = false;
+
+    // Auto-parse the reconstructed message
+    btnParse.click();
+  } catch (err) {
+    alert(`Import failed: ${err.message}`);
+  }
 });
 
 btnExport.addEventListener('click', () => {
