@@ -1,6 +1,6 @@
 import { parseISO8583 } from './parser.js';
 import { renderMessage } from './renderer.js';
-import { downloadJSON } from './exporter.js';
+import { downloadJSON, copyJSONToClipboard } from './exporter.js';
 
 // ── Sample 0200 Authorization Request ────────────────────────────────────────
 //
@@ -62,6 +62,7 @@ const btnParse      = document.getElementById('btnParse');
 const btnSample     = document.getElementById('btnSample');
 const btnClear      = document.getElementById('btnClear');
 const btnExport     = document.getElementById('btnExport');
+const btnCopy       = document.getElementById('btnCopy');
 const outputSection = document.getElementById('outputSection');
 const mtiValue      = document.getElementById('mtiValue');
 const primaryBitmapValue   = document.getElementById('primaryBitmapValue');
@@ -138,4 +139,16 @@ btnExport.addEventListener('click', () => {
   if (!lastParsed) return;
   const mti = lastParsed.mti ?? 'unknown';
   downloadJSON(lastParsed, `iso8583-${mti}-${Date.now()}.json`);
+});
+
+btnCopy.addEventListener('click', async () => {
+  if (!lastParsed) return;
+  const ok = await copyJSONToClipboard(lastParsed);
+  const original = btnCopy.textContent;
+  btnCopy.textContent = ok ? '✓ Copied!' : '✗ Failed';
+  btnCopy.disabled = true;
+  setTimeout(() => {
+    btnCopy.textContent = original;
+    btnCopy.disabled = false;
+  }, 2000);
 });

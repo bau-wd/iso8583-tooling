@@ -9,6 +9,23 @@ export function exportToJSON(parsedMessage) {
 }
 
 /**
+ * Copies the parsed message as pretty-printed JSON to the clipboard.
+ * Returns a Promise that resolves to true on success, false on failure.
+ *
+ * @param {object} parsedMessage
+ * @returns {Promise<boolean>}
+ */
+export async function copyJSONToClipboard(parsedMessage) {
+  const json = exportToJSON(parsedMessage);
+  try {
+    await navigator.clipboard.writeText(json);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Triggers a browser download of the parsed message as a .json file.
  *
  * @param {object} parsedMessage
