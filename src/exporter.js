@@ -5,7 +5,18 @@
  * @returns {string}
  */
 export function exportToJSON(parsedMessage) {
-  return JSON.stringify(parsedMessage, null, 2);
+  // rawHex is derivable from value + field definition, so omit it
+  // to keep the export clean and LLM-friendly.
+  const clean = {
+    ...parsedMessage,
+    fields: Object.fromEntries(
+      Object.entries(parsedMessage.fields).map(([k, f]) => {
+        const { rawHex, ...rest } = f; // eslint-disable-line no-unused-vars
+        return [k, rest];
+      })
+    ),
+  };
+  return JSON.stringify(clean, null, 2);
 }
 
 /**

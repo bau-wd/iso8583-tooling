@@ -1,6 +1,10 @@
+import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
+
 /**
  * Reconstructs a hex-encoded ISO 8583 message from a parsed JSON object —
  * the same format produced by exportToJSON / downloadJSON.
+ * rawHex is re-derived from each field's value + the canonical field definition,
+ * so the JSON does not need to carry rawHex at all.
  *
  * @param {object} parsed
  * @returns {string} Uppercase hex string
@@ -32,10 +36,14 @@ export function buildHexFromJSON(parsed) {
 
   for (const de of sortedDEs) {
     const field = fields[de];
-    if (!field || field.rawHex == null) {
-      throw new Error(`DE${de}: missing rawHex in JSON.`);
+    const def   = FIELD_DEFINITIONS[de];
+    if (!def) {
+      throw new Error(`DE${de}: No field definition found.`);
     }
-    hex += buildFieldHex(field);
+    if (!field || field.value == null) {
+      throw new Error(`DE${de}: missing value in JSON.`);
+    }
+    hex += buildFieldHex(field, def);
   }
 
   return hex;
@@ -70,18 +78,25 @@ function asciiToHex(str) {
     .join('');
 }
 
-function buildFieldHex(field) {
-  const { lengthType, length, rawHex } = field;
-  const raw = rawHex.toUpperCase();
+/**
+ * Encodes a single field's value into its wire-format hex representation.
+ * rawHex is derived from the value:
+ *   - binary fields (format 'b'): value IS the hex string
+ *   - all other fields:           value is ASCII text → encoded as hex pairs
+ */
+function buildFieldHex(field, def) {
+  const isBinary = def.format === 'b';
+  const rawHex   = isBinary ? field.value.toUpperCase() : asciiToHex(field.value);
+  const length   = isBinary ? rawHex.length / 2 : field.value.length;
 
-  if (lengthType === 'LLVAR') {
+  if (def.lengthType === 'LLVAR') {
     // 2-digit ASCII length prefix, ASCII-encoded as hex
-    return asciiToHex(String(length).padStart(2, '0')) + raw;
+    return asciiToHex(String(length).padStart(2, '0')) + rawHex;
   }
-  if (lengthType === 'LLLVAR') {
+  if (def.lengthType === 'LLLVAR') {
     // 3-digit ASCII length prefix, ASCII-encoded as hex
-    return asciiToHex(String(length).padStart(3, '0')) + raw;
+    return asciiToHex(String(length).padStart(3, '0')) + rawHex;
   }
   // fixed
-  return raw;
+  return rawHex;
 }
