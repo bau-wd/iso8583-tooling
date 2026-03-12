@@ -5,15 +5,13 @@
  * @returns {string}
  */
 export function exportToJSON(parsedMessage) {
-  // rawHex is derivable from value + field definition, so omit it
-  // to keep the export clean and LLM-friendly.
+  // Minimal LLM-friendly format: only mti + a flat { deNumber: value } map.
+  // Bitmaps are computed from the field keys on import; format/lengthType/name
+  // come from FIELD_DEFINITIONS. No rawHex or metadata needed.
   const clean = {
-    ...parsedMessage,
+    mti: parsedMessage.mti,
     fields: Object.fromEntries(
-      Object.entries(parsedMessage.fields).map(([k, f]) => {
-        const { rawHex, ...rest } = f; // eslint-disable-line no-unused-vars
-        return [k, rest];
-      })
+      Object.entries(parsedMessage.fields).map(([k, f]) => [k, f.value])
     ),
   };
   return JSON.stringify(clean, null, 2);

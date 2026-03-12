@@ -1,10 +1,11 @@
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
 
 /**
- * Reconstructs a hex-encoded ISO 8583 message from a parsed JSON object —
- * the same format produced by exportToJSON / downloadJSON.
- * rawHex is re-derived from each field's value + the canonical field definition,
- * so the JSON does not need to carry rawHex at all.
+ * Reconstructs a hex-encoded ISO 8583 message from the minimal JSON format:
+ *   { mti: "0200", fields: { "2": "4111111111111111", "3": "000000", ... } }
+ *
+ * Bitmaps are computed from the DE keys present.
+ * Field encoding (format, lengthType) comes from FIELD_DEFINITIONS.
  *
  * @param {object} parsed
  * @returns {string} Uppercase hex string
@@ -13,37 +14,24 @@ export function buildHexFromJSON(parsed) {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Invalid input: expected a JSON object.');
   }
-  const { mti, primaryBitmap, secondaryBitmap, fields } = parsed;
-  if (!mti || !primaryBitmap || !fields) {
-    throw new Error('Invalid ISO 8583 JSON: missing required properties (mti, primaryBitmap, fields).');
+  const { mti, fields } = parsed;
+  if (!mti || !fields) {
+    throw new Error('Invalid ISO 8583 JSON: missing required properties (mti, fields).');
   }
 
-  let hex = '';
-
-  // MTI (ASCII → hex)
-  hex += asciiToHex(mti);
-
-  // Primary Bitmap (already hex)
-  hex += primaryBitmap.toUpperCase();
-
-  // Secondary Bitmap (if present)
-  if (secondaryBitmap) {
-    hex += secondaryBitmap.toUpperCase();
-  }
-
-  // Data Elements, sorted by DE number
   const sortedDEs = Object.keys(fields).map(Number).sort((a, b) => a - b);
+  const { primaryBitmap, secondaryBitmap } = computeBitmaps(sortedDEs);
+
+  let hex = asciiToHex(mti);
+  hex += primaryBitmap;
+  if (secondaryBitmap) hex += secondaryBitmap;
 
   for (const de of sortedDEs) {
-    const field = fields[de];
+    const value = fields[de];
     const def   = FIELD_DEFINITIONS[de];
-    if (!def) {
-      throw new Error(`DE${de}: No field definition found.`);
-    }
-    if (!field || field.value == null) {
-      throw new Error(`DE${de}: missing value in JSON.`);
-    }
-    hex += buildFieldHex(field, def);
+    if (!def)        throw new Error(`DE${de}: No field definition found.`);
+    if (value == null) throw new Error(`DE${de}: missing value in JSON.`);
+    hex += buildFieldHex(String(value), def);
   }
 
   return hex;
@@ -72,6 +60,34 @@ export function readJSONFile(file) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Computes primary (and optional secondary) bitmap hex from a sorted list of
+ * DE numbers. Sets bit 1 in the primary bitmap automatically when any DE > 64
+ * is present.
+ */
+function computeBitmaps(deNumbers) {
+  const bytes = new Uint8Array(16);
+
+  const hasSec = deNumbers.some(de => de > 64);
+  if (hasSec) bytes[0] |= 0x80; // bit 1 → secondary bitmap present
+
+  for (const de of deNumbers) {
+    const bitIndex  = de - 1;             // 0-based
+    const byteIndex = Math.floor(bitIndex / 8);
+    const bitPos    = 7 - (bitIndex % 8); // MSB-first
+    bytes[byteIndex] |= (1 << bitPos);
+  }
+
+  const fullHex = Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+    .join('');
+
+  return {
+    primaryBitmap:   fullHex.slice(0, 16),
+    secondaryBitmap: hasSec ? fullHex.slice(16, 32) : null,
+  };
+}
+
 function asciiToHex(str) {
   return Array.from(str)
     .map(c => c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())
@@ -79,24 +95,21 @@ function asciiToHex(str) {
 }
 
 /**
- * Encodes a single field's value into its wire-format hex representation.
- * rawHex is derived from the value:
- *   - binary fields (format 'b'): value IS the hex string
- *   - all other fields:           value is ASCII text → encoded as hex pairs
+ * Encodes a field value string into its wire-format hex:
+ *   - binary fields (format 'b'): value is already hex
+ *   - all other fields: ASCII text → hex pairs
+ * Prepends LLVAR/LLLVAR length prefix where required.
  */
-function buildFieldHex(field, def) {
+function buildFieldHex(value, def) {
   const isBinary = def.format === 'b';
-  const rawHex   = isBinary ? field.value.toUpperCase() : asciiToHex(field.value);
-  const length   = isBinary ? rawHex.length / 2 : field.value.length;
+  const rawHex   = isBinary ? value.toUpperCase() : asciiToHex(value);
+  const length   = isBinary ? rawHex.length / 2 : value.length;
 
   if (def.lengthType === 'LLVAR') {
-    // 2-digit ASCII length prefix, ASCII-encoded as hex
     return asciiToHex(String(length).padStart(2, '0')) + rawHex;
   }
   if (def.lengthType === 'LLLVAR') {
-    // 3-digit ASCII length prefix, ASCII-encoded as hex
     return asciiToHex(String(length).padStart(3, '0')) + rawHex;
   }
-  // fixed
   return rawHex;
 }
