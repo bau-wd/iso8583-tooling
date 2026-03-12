@@ -15,34 +15,21 @@ You MUST return a JSON object that strictly follows this schema:
 ```json
 {
   "mti": "<4-char string, e.g. '0200'>",
-  "primaryBitmap": "<16 uppercase hex chars, 8 bytes>",
-  "secondaryBitmap": "<16 uppercase hex chars or null>",
   "fields": {
-    "<de_number_as_string>": {
-      "de": <number>,
-      "name": "<ISO 8583:1993 field name>",
-      "format": "<'n'|'an'|'ans'|'b'|'z'|'x+n'>",
-      "lengthType": "<'fixed'|'LLVAR'|'LLLVAR'>",
-      "length": <number of characters/bytes>,
-      "value": "<decoded ASCII value>",
-      "rawHex": "<uppercase hex representation of the value only, no length prefix>"
-    }
-  },
-  "errors": []
+    "<de_number_as_string>": "<decoded ASCII value>"
+  }
 }
 ```
+
+That's it — nothing else. The tool computes bitmaps automatically from the DE keys present.
 
 ### Field rules
 
 | Rule | Detail |
 |------|--------|
 | `mti` | 4 ASCII chars: first digit = version (0), second = message class (1=auth,2=financial,4=reversal,5=reconciliation,6=admin,8=network), third = function (0=request,1=response,2=advice), fourth = originator (0=acquirer) |
-| `primaryBitmap` | 16 hex chars. Bit N is set if DE N is present. Bit 1 set = secondary bitmap present. |
-| `secondaryBitmap` | 16 hex chars covering DE65–128. `null` if no DE > 64 present. |
-| `fields` | Only include DEs that are actually present in the message. |
-| `value` | Human-readable decoded string (e.g. `"4111111111111111"` for a PAN) |
-| `rawHex` | Hex of the value bytes only — NO length prefix bytes for LLVAR/LLLVAR fields |
-| `errors` | Always an empty array `[]` for generated messages |
+| `fields` | Only include DEs that are actually present in the message. Keys are DE numbers as strings. |
+| field `value` | Human-readable decoded string (e.g. `"4111111111111111"` for a PAN). For binary fields (`b`), provide the raw hex string. |
 
 ---
 
@@ -98,28 +85,6 @@ You MUST return a JSON object that strictly follows this schema:
 
 ---
 
-## Bitmap Construction
-
-To compute the bitmap:
-1. Create a 64-bit (8-byte) number, all zeros.
-2. For each DE present, set bit N (where bit 1 = most significant bit of byte 1).
-3. Encode as 16 uppercase hex chars.
-
-Example — DE 2,3,4,7,11,12,13,22,25,35,41,42,49 present:
-```
-Bits set: 2,3,4,7,11,12,13,22,25,35,41,42,49
-Byte 1 (bits 1–8):   01110010 = 0x72  (bits 2,3,4,7)
-Byte 2 (bits 9–16):  00111000 = 0x38  (bits 11,12,13)
-Byte 3 (bits 17–24): 00000000 = 0x00
-Byte 4 (bits 25–32): 00000001 = 0x01  (bit 25... wait: bit 25 is position 1 of byte 4 → 0x80... )
-→ Recompute carefully per bit position
-Primary bitmap: 7238000102C08000
-```
-
-Always double-check your bitmap against the fields you include.
-
----
-
 ## Task
 
 Generate a valid ISO 8583:1993 test message JSON for the following scenario:
@@ -152,10 +117,3 @@ One paragraph describing what this message represents, the actors involved, and 
 ```json
 { ... }
 ```
-
-### Bitmap Verification
-Show your bitmap construction work:
-- List all DEs present
-- Show bit positions
-- Show each bitmap byte in binary and hex
-- Confirm final bitmap hex matches `primaryBitmap` in the JSON
