@@ -102,14 +102,27 @@ function asciiToHex(str) {
  */
 function buildFieldHex(value, def) {
   const isBinary = def.format === 'b';
-  const rawHex   = isBinary ? value.toUpperCase() : asciiToHex(value);
-  const length   = isBinary ? rawHex.length / 2 : value.length;
+
+  // Fixed-length fields must be padded to exactly maxLength on the wire.
+  // Numeric / amount fields are zero-padded on the left;
+  // all text fields (a, an, ans, z, …) are space-padded on the right.
+  let encodedValue = value;
+  if (!isBinary && def.lengthType === 'fixed') {
+    if (def.format === 'n' || def.format === 'x+n') {
+      encodedValue = value.padStart(def.maxLength, '0');
+    } else {
+      encodedValue = value.padEnd(def.maxLength, ' ');
+    }
+  }
+
+  const rawHex = isBinary ? value.toUpperCase() : asciiToHex(encodedValue);
+  const length = isBinary ? rawHex.length / 2 : encodedValue.length;
 
   if (def.lengthType === 'LLVAR') {
-    return asciiToHex(String(length).padStart(2, '0')) + rawHex;
+    return asciiToHex(String(value.length).padStart(2, '0')) + rawHex;
   }
   if (def.lengthType === 'LLLVAR') {
-    return asciiToHex(String(length).padStart(3, '0')) + rawHex;
+    return asciiToHex(String(value.length).padStart(3, '0')) + rawHex;
   }
   return rawHex;
 }
