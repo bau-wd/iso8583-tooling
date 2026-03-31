@@ -10,6 +10,8 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 - 🗂 **Visualize** all data elements (DE1–DE128) in a structured, color-coded table
 - 🗺 **Bitmap decoding** — primary and secondary bitmaps parsed automatically
 - 📤 **Export to JSON** — download the parsed message as a `.json` file
+- 🧭 **Message history** — recent parses are stored locally and can be reloaded with one click
+- 🔗 **Shareable links** — share hex or JSON payloads via URL for easy collaboration
 - ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
 - 📦 **Zero backend** — runs entirely in the browser
 - 🎨 **Color-coded fields** by category (card data, auth data, private data)
@@ -54,6 +56,8 @@ npm run preview
    - Primary (and secondary) bitmap hex values
    - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
 5. Click **Export JSON** to download the parsed result as a `.json` file.
+6. Use **Copy Hex Link** or **Copy JSON Link** to generate a shareable URL that preloads the message.
+7. Recent messages appear in **History**; click **Load** to repopulate the input instantly.
 
 ---
 

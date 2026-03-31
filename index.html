@@ -77,9 +77,21 @@
         <div class="output-actions">
           <button id="btnExport" class="btn btn-primary">Export JSON</button>
           <button id="btnCopy" class="btn btn-secondary">Copy JSON</button>
+          <button id="btnShareHex" class="btn btn-secondary">Copy Hex Link</button>
+          <button id="btnShareJson" class="btn btn-secondary">Copy JSON Link</button>
         </div>
 
         <div id="tableContainer"></div>
+      </section>
+
+      <!-- History Section -->
+      <section class="card history-section">
+        <div class="history-header">
+          <h2>History</h2>
+          <button id="btnClearHistory" class="btn btn-secondary btn-sm">Clear</button>
+        </div>
+        <p class="helper-text">Recently parsed or rebuilt messages (stored locally in your browser).</p>
+        <ul id="historyList" class="history-list"></ul>
       </section>
     </main>
 
