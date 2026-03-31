@@ -65,7 +65,7 @@ export function readJSONFile(file) {
  * DE numbers. Sets bit 1 in the primary bitmap automatically when any DE > 64
  * is present.
  */
-function computeBitmaps(deNumbers) {
+export function computeBitmaps(deNumbers) {
   const bytes = new Uint8Array(16);
 
   const hasSec = deNumbers.some(de => de > 64);
