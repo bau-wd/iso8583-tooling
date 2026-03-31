@@ -3,6 +3,7 @@ import { renderMessage, renderComparison } from './renderer.js';
 import { downloadJSON, copyJSONToClipboard } from './exporter.js';
 import { buildHexFromJSON, readJSONFile, computeBitmaps } from './importer.js';
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
+import { NETWORK_PRESETS, validateMessageProfile, findPreset } from './networkProfiles.js';
 import { SAMPLE_HEX } from './sample.js';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
@@ -39,6 +40,9 @@ const btnUseCurrentA = document.getElementById('btnUseCurrentA');
 const btnUseCurrentB = document.getElementById('btnUseCurrentB');
 const compareError = document.getElementById('compareError');
 const compareResult = document.getElementById('compareResult');
+const networkPresetSelect = document.getElementById('networkPreset');
+const profileBadge = document.getElementById('profileBadge');
+const profileStatus = document.getElementById('profileStatus');
 
 // Builder DOM refs
 const builderMtiInput          = document.getElementById('builderMti');
@@ -58,6 +62,8 @@ const builderCopyHex           = document.getElementById('builderCopyHex');
 const builderCopyJson          = document.getElementById('builderCopyJson');
 const builderDownloadJson      = document.getElementById('builderDownloadJson');
 const builderSendToParser      = document.getElementById('builderSendToParser');
+const builderNetworkPreset     = document.getElementById('builderNetworkPreset');
+const builderProfileStatus     = document.getElementById('builderProfileStatus');
 
 const HISTORY_KEY   = 'iso8583-history';
 const HISTORY_LIMIT = 10;
@@ -69,7 +75,7 @@ let lastHexInput = '';
 let lastSkipBytes = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function showOutput(parsed) {
+function showOutput(parsed, validation) {
   lastParsed = parsed;
 
   mtiValue.textContent = parsed.mti ?? '—';
@@ -85,9 +91,72 @@ function showOutput(parsed) {
   const count = Object.keys(parsed.fields).length;
   fieldCount.textContent = `${count} field${count !== 1 ? 's' : ''}`;
 
-  renderMessage(tableContainer, parsed);
+  const validationInfo = validation || {
+    profile: findPreset(networkPresetSelect?.value || 'none'),
+    errors: [],
+    warnings: [],
+  };
+  updateProfileSummary(validationInfo);
+
+  renderMessage(tableContainer, parsed, validationInfo);
   outputSection.classList.remove('hidden');
   outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function updateProfileSummary(validation) {
+  if (!profileBadge || !profileStatus) return;
+
+  const profileLabel = validation?.profile?.label ?? 'No preset';
+  const errors = validation?.errors?.length ?? 0;
+  const warnings = validation?.warnings?.length ?? 0;
+
+  let badgeClass = 'badge badge-neutral';
+  if (errors > 0) badgeClass = 'badge badge-fail';
+  else if (warnings > 0) badgeClass = 'badge badge-warn';
+  else badgeClass = 'badge badge-pass';
+
+  profileBadge.textContent = profileLabel;
+  profileBadge.className = badgeClass;
+
+  if (!validation) {
+    profileStatus.textContent = 'Validation not run.';
+    return;
+  }
+
+  if (errors > 0) {
+    profileStatus.textContent = `${errors} required field${errors === 1 ? '' : 's'} missing for this preset.`;
+  } else if (warnings > 0) {
+    profileStatus.textContent = `${warnings} warning${warnings === 1 ? '' : 's'} for this preset.`;
+  } else {
+    profileStatus.textContent = 'Message satisfies preset requirements.';
+  }
+}
+
+function updateBuilderValidationStatus(validation) {
+  if (!builderProfileStatus) return;
+
+  const errors = validation?.errors?.length ?? 0;
+  const warnings = validation?.warnings?.length ?? 0;
+  const profileLabel = validation?.profile?.label ?? 'No preset';
+
+  let badgeClass = 'badge badge-neutral';
+  let text = profileLabel;
+
+  if (validation?.profile?.id === 'none') {
+    text = 'Validation off';
+  } else if (errors > 0) {
+    badgeClass = 'badge badge-fail';
+    text = `${errors} required field${errors === 1 ? '' : 's'} missing`;
+  } else if (warnings > 0) {
+    badgeClass = 'badge badge-warn';
+    text = `${warnings} warning${warnings === 1 ? '' : 's'}`;
+  } else if (validation) {
+    badgeClass = 'badge badge-pass';
+    text = 'Preset satisfied';
+  }
+
+  builderProfileStatus.textContent = text;
+  builderProfileStatus.className = badgeClass;
 }
 
 function toMinimalJSON(parsed) {
@@ -135,6 +204,14 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function populatePresetSelect(select) {
+  if (!select) return;
+  select.innerHTML = NETWORK_PRESETS
+    .map(preset => `<option value="${preset.id}">${escapeHtml(preset.label)}</option>`)
+    .join('');
+  select.value = NETWORK_PRESETS[0].id;
 }
 
 function populateFieldSelect() {
@@ -197,28 +274,28 @@ function renderBuilderFields() {
 }
 
 function refreshBuilderOutputs() {
-  const errors = [];
+  const structuralErrors = [];
   const mti = builderMtiInput.value.trim();
   const cleanFields = {};
 
   if (mti.length !== 4) {
-    errors.push('MTI must be exactly 4 characters.');
+    structuralErrors.push('MTI must be exactly 4 characters.');
   }
 
   for (const [deStr, rawValue] of Object.entries(builderState.fields)) {
     const de = Number(deStr);
     const def = FIELD_DEFINITIONS[de];
     if (!def) {
-      errors.push(`DE${de}: no definition available.`);
+      structuralErrors.push(`DE${de}: no definition available.`);
       continue;
     }
 
     const value = String(rawValue);
     if ((def.lengthType === 'LLVAR' || def.lengthType === 'LLLVAR') && value.length > def.maxLength) {
-      errors.push(`DE${de}: value exceeds maximum length of ${def.maxLength}.`);
+      structuralErrors.push(`DE${de}: value exceeds maximum length of ${def.maxLength}.`);
     }
     if (def.lengthType === 'fixed' && value.length > def.maxLength) {
-      errors.push(`DE${de}: fixed length ${def.maxLength}, current length ${value.length}.`);
+      structuralErrors.push(`DE${de}: fixed length ${def.maxLength}, current length ${value.length}.`);
     }
     cleanFields[de] = value;
   }
@@ -231,28 +308,40 @@ function refreshBuilderOutputs() {
   let hex = '';
   let jsonText = '';
 
-  if (errors.length === 0 && mti.length === 4) {
+  if (structuralErrors.length === 0 && mti.length === 4) {
     try {
       const payload = { mti, fields: cleanFields };
       hex = buildHexFromJSON(payload);
       jsonText = JSON.stringify(payload, null, 2);
     } catch (err) {
-      errors.push(err.message);
+      structuralErrors.push(err.message);
     }
   }
 
   builderHexOutput.value = hex;
   builderJsonOutput.value = jsonText;
 
-  if (errors.length > 0) {
+  const builderValidation = validateMessageProfile(
+    { mti, fields: cleanFields },
+    builderNetworkPreset?.value || 'none'
+  );
+  updateBuilderValidationStatus(builderValidation);
+
+  const messages = [
+    ...structuralErrors,
+    ...builderValidation.errors.map(e => `Validation: ${e}`),
+    ...builderValidation.warnings.map(w => `Validation: ${w}`),
+  ];
+
+  if (messages.length > 0) {
     builderErrorBox.classList.remove('hidden');
-    builderErrorBox.innerHTML = `<strong>⚠ Builder warnings:</strong><ul>${errors.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
+    builderErrorBox.innerHTML = `<strong>⚠ Builder checks:</strong><ul>${messages.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`;
   } else {
     builderErrorBox.classList.add('hidden');
     builderErrorBox.innerHTML = '';
   }
 
-  return { hex, jsonText };
+  return { hex, jsonText, validation: builderValidation };
 }
 
 // ── History helpers ───────────────────────────────────────────────────────
@@ -419,6 +508,9 @@ function getSkipValue(checkbox, input) {
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
+populatePresetSelect(networkPresetSelect);
+populatePresetSelect(builderNetworkPreset);
+
 btnParse.addEventListener('click', () => {
   const raw = hexInput.value.trim();
   if (!raw) {
@@ -436,19 +528,29 @@ btnParse.addEventListener('click', () => {
   lastSkipBytes = options.skipBytes;
 
   // Use setTimeout to allow the UI to update before heavy work
-  setTimeout(() => {
-    try {
-      const parsed = parseISO8583(raw, options);
-      showOutput(parsed);
-      addToHistory(parsed, raw, options.skipBytes);
-    } catch (err) {
-      alert(`Fatal parse error: ${err.message}`);
-    } finally {
-      btnParse.disabled = false;
+    setTimeout(() => {
+      try {
+        const parsed = parseISO8583(raw, options);
+        const presetId = networkPresetSelect?.value || 'none';
+        const validation = validateMessageProfile(parsed, presetId);
+        showOutput(parsed, validation);
+        addToHistory(parsed, raw, options.skipBytes);
+      } catch (err) {
+        alert(`Fatal parse error: ${err.message}`);
+      } finally {
+        btnParse.disabled = false;
       btnParse.textContent = 'Parse Message';
     }
   }, 10);
 });
+
+if (networkPresetSelect) {
+  networkPresetSelect.addEventListener('change', () => {
+    if (!lastParsed) return;
+    const validation = validateMessageProfile(lastParsed, networkPresetSelect.value);
+    showOutput(lastParsed, validation);
+  });
+}
 
 btnSample.addEventListener('click', () => {
   hexInput.value = SAMPLE_HEX;
@@ -611,6 +713,12 @@ builderFieldSelect.addEventListener('change', () => {
   builderFieldMeta.textContent = describeField(def);
 });
 
+if (builderNetworkPreset) {
+  builderNetworkPreset.addEventListener('change', () => {
+    refreshBuilderOutputs();
+  });
+}
+
 builderAddField.addEventListener('click', () => {
   const de = Number(builderFieldSelect.value);
   if (!de) {
@@ -687,6 +795,9 @@ builderSendToParser.addEventListener('click', () => {
   if (!hex) {
     alert('Build a valid message first.');
     return;
+  }
+  if (networkPresetSelect && builderNetworkPreset) {
+    networkPresetSelect.value = builderNetworkPreset.value;
   }
   hexInput.value = hex;
   skipHeader.checked = false;
