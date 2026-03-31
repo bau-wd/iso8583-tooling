@@ -4,7 +4,10 @@ import { downloadJSON, copyJSONToClipboard } from './exporter.js';
 import { buildHexFromJSON, readJSONFile, computeBitmaps } from './importer.js';
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
 import { NETWORK_PRESETS, validateMessageProfile, findPreset } from './networkProfiles.js';
-import { SAMPLE_HEX } from './sample.js';
+import { SAMPLE_HEX, buildSampleHex } from './sample.js';
+import { ENCODING_OPTIONS, encodingLabel, normalizeEncoding, textToHex, byteLength } from './encoding.js';
+
+const DEFAULT_ENCODING = 'ascii';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const hexInput      = document.getElementById('hexInput');
@@ -43,6 +46,16 @@ const compareResult = document.getElementById('compareResult');
 const networkPresetSelect = document.getElementById('networkPreset');
 const profileBadge = document.getElementById('profileBadge');
 const profileStatus = document.getElementById('profileStatus');
+const encodingSelect = document.getElementById('encodingSelect');
+
+// Field helper refs
+const helperFieldSelect = document.getElementById('fieldSelect');
+const helperFormat = document.getElementById('helperFormat');
+const helperLength = document.getElementById('helperLength');
+const helperHint = document.getElementById('helperHint');
+const helperSample = document.getElementById('helperSample');
+const helperHexPreview = document.getElementById('helperHexPreview');
+const helperEncoding = document.getElementById('helperEncoding');
 
 // Builder DOM refs
 const builderMtiInput          = document.getElementById('builderMti');
@@ -74,7 +87,102 @@ let lastParsed = null;
 let lastHexInput = '';
 let lastSkipBytes = 0;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Encoding helpers ─────────────────────────────────────────────────────────
+function currentEncoding() {
+  return normalizeEncoding(encodingSelect?.value || DEFAULT_ENCODING);
+}
+
+function populateEncodingSelect() {
+  if (!encodingSelect) return;
+  encodingSelect.innerHTML = ENCODING_OPTIONS
+    .map(opt => `<option value="${opt.value}">${opt.label}</option>`)
+    .join('');
+  encodingSelect.value = DEFAULT_ENCODING;
+}
+
+// ── Field helper (UI) ───────────────────────────────────────────────────────
+function formatDescription(format) {
+  switch (format) {
+    case 'n': return 'Numeric (digits only)';
+    case 'x+n': return 'Signed numeric amount (leading sign)';
+    case 'an': return 'Alphanumeric (A–Z, 0–9)';
+    case 'ans': return 'Alphanumeric with specials';
+    case 'z': return 'Track data (digits, =, D, separators)';
+    case 'b': return 'Binary data (raw hex bytes)';
+    default: return 'Free-form text';
+  }
+}
+
+function sampleValueFor(def) {
+  const safeLen = Math.min(def.maxLength, 8);
+  if (def.format === 'b') {
+    return 'AA'.repeat(Math.max(1, Math.min(def.maxLength, 4)));
+  }
+  if (def.format === 'n') {
+    return '1'.repeat(Math.max(1, Math.min(safeLen, 6)));
+  }
+  if (def.format === 'x+n') {
+    const digits = Math.max(1, Math.min(safeLen - 1, 5));
+    return `+${'1'.repeat(digits)}`;
+  }
+  if (def.format === 'z') {
+    return '4111111111111111=2512';
+  }
+  return 'SAMPLE'.padEnd(Math.max(1, Math.min(safeLen, 6)), 'X').slice(0, safeLen);
+}
+
+function populateHelperFieldSelect() {
+  if (!helperFieldSelect) return;
+  const entries = Object.keys(FIELD_DEFINITIONS).map(Number).sort((a, b) => a - b);
+  helperFieldSelect.innerHTML = entries
+    .map(de => {
+      const def = FIELD_DEFINITIONS[de];
+      return `<option value="${de}">DE${String(de).padStart(3, '0')} — ${def.name}</option>`;
+    })
+    .join('');
+  helperFieldSelect.value = '2';
+}
+
+function updateFieldHelper() {
+  if (!helperFieldSelect || !helperFormat || !helperLength || !helperHint) return;
+  const selected = Number(helperFieldSelect.value || 2);
+  const def = FIELD_DEFINITIONS[selected] || FIELD_DEFINITIONS[2];
+  const encoding = currentEncoding();
+
+  helperFormat.textContent = def.format;
+  const maxText = `${def.maxLength} char${def.maxLength !== 1 ? 's' : ''}`;
+  const lengthDetail = def.lengthType === 'fixed'
+    ? `Fixed (${maxText})`
+    : `${def.lengthType} up to ${maxText}`;
+  helperLength.textContent = lengthDetail;
+  const lengthHint = def.lengthType === 'fixed'
+    ? 'No length prefix required.'
+    : `${def.lengthType} prefix is encoded using ${encodingLabel(encoding)} digits.`;
+  helperHint.textContent = `${formatDescription(def.format)} • ${lengthHint}`;
+  helperEncoding.textContent = `Preview encoding: ${encodingLabel(encoding)}`;
+
+  const sample = sampleValueFor(def);
+  helperSample.textContent = sample;
+
+  try {
+    const valueHex = def.format === 'b' ? sample.toUpperCase() : textToHex(sample, encoding);
+    const bodyLength = def.format === 'b' ? valueHex.length / 2 : byteLength(sample, encoding);
+    const prefixHex = (() => {
+      if (def.lengthType === 'LLVAR') {
+        return textToHex(String(bodyLength).padStart(2, '0'), encoding);
+      }
+      if (def.lengthType === 'LLLVAR') {
+        return textToHex(String(bodyLength).padStart(3, '0'), encoding);
+      }
+      return '';
+    })();
+    helperHexPreview.textContent = `${prefixHex}${valueHex}`;
+  } catch (err) {
+    helperHexPreview.textContent = `Preview unavailable: ${err.message}`;
+  }
+}
+
+// ── Parser helpers ───────────────────────────────────────────────────────────
 function showOutput(parsed, validation) {
   lastParsed = parsed;
 
@@ -214,7 +322,7 @@ function populatePresetSelect(select) {
   select.value = NETWORK_PRESETS[0].id;
 }
 
-function populateFieldSelect() {
+function populateBuilderFieldSelect() {
   const defs = Object.values(FIELD_DEFINITIONS)
     .filter(def => def.de !== 1)
     .sort((a, b) => a.de - b.de);
@@ -311,7 +419,7 @@ function refreshBuilderOutputs() {
   if (structuralErrors.length === 0 && mti.length === 4) {
     try {
       const payload = { mti, fields: cleanFields };
-      hex = buildHexFromJSON(payload);
+      hex = buildHexFromJSON(payload, { encoding: currentEncoding() });
       jsonText = JSON.stringify(payload, null, 2);
     } catch (err) {
       structuralErrors.push(err.message);
@@ -406,6 +514,13 @@ function renderHistory(list = loadHistory()) {
       meta.appendChild(skip);
     }
 
+    if (item.encoding && item.encoding !== DEFAULT_ENCODING) {
+      const enc = document.createElement('span');
+      enc.className = 'tag';
+      enc.textContent = encodingLabel(item.encoding);
+      meta.appendChild(enc);
+    }
+
     info.appendChild(meta);
 
     const actions = document.createElement('div');
@@ -422,9 +537,9 @@ function renderHistory(list = loadHistory()) {
   });
 }
 
-function addToHistory(parsed, hex, skipBytes) {
+function addToHistory(parsed, hex, skipBytes, encoding) {
   const history = loadHistory().filter(
-    (h) => !(h.hex === hex && (h.skipBytes || 0) === (skipBytes || 0))
+    (h) => !(h.hex === hex && (h.skipBytes || 0) === (skipBytes || 0) && normalizeEncoding(h.encoding) === normalizeEncoding(encoding))
   );
 
   history.unshift({
@@ -432,6 +547,7 @@ function addToHistory(parsed, hex, skipBytes) {
     mti: parsed.mti ?? '????',
     fieldCount: Object.keys(parsed.fields || {}).length,
     skipBytes: skipBytes || 0,
+    encoding: normalizeEncoding(encoding),
     timestamp: Date.now(),
   });
 
@@ -450,6 +566,11 @@ function clearHistory() {
 
 function hydrateFromSharedLink() {
   const params = new URLSearchParams(window.location.search);
+  if (params.has('encoding')) {
+    const enc = normalizeEncoding(params.get('encoding'));
+    if (encodingSelect) encodingSelect.value = enc;
+  }
+
   if (params.has('hex')) {
     const sharedHex = params.get('hex') || '';
     const sharedSkip = parseInt(params.get('skip'), 10) || 0;
@@ -465,7 +586,7 @@ function hydrateFromSharedLink() {
     try {
       const sharedJSON = params.get('json');
       const parsedJSON = JSON.parse(sharedJSON);
-      const hex = buildHexFromJSON(parsedJSON);
+      const hex = buildHexFromJSON(parsedJSON, { encoding: currentEncoding() });
       hexInput.value = hex;
       skipHeader.checked = false;
       btnParse.click();
@@ -478,16 +599,22 @@ function hydrateFromSharedLink() {
   return false;
 }
 
-function buildShareUrlFromHex(hex, skipBytes) {
+function buildShareUrlFromHex(hex, skipBytes, encoding) {
   const params = new URLSearchParams();
   params.set('hex', hex);
   if (skipBytes) params.set('skip', skipBytes);
+  if (encoding && normalizeEncoding(encoding) !== DEFAULT_ENCODING) {
+    params.set('encoding', normalizeEncoding(encoding));
+  }
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
-function buildShareUrlFromJSON(parsed) {
+function buildShareUrlFromJSON(parsed, encoding) {
   const params = new URLSearchParams();
   params.set('json', JSON.stringify(toMinimalJSON(parsed)));
+  if (encoding && normalizeEncoding(encoding) !== DEFAULT_ENCODING) {
+    params.set('encoding', normalizeEncoding(encoding));
+  }
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
@@ -508,8 +635,17 @@ function getSkipValue(checkbox, input) {
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
+populateEncodingSelect();
 populatePresetSelect(networkPresetSelect);
 populatePresetSelect(builderNetworkPreset);
+populateHelperFieldSelect();
+populateBuilderFieldSelect();
+updateFieldHelper();
+if (helperFieldSelect) helperFieldSelect.addEventListener('change', updateFieldHelper);
+if (encodingSelect) encodingSelect.addEventListener('change', () => {
+  updateFieldHelper();
+  refreshBuilderOutputs();
+});
 
 btnParse.addEventListener('click', () => {
   const raw = hexInput.value.trim();
@@ -523,22 +659,23 @@ btnParse.addEventListener('click', () => {
 
   const options = {
     skipBytes: skipHeader.checked ? parseInt(skipBytes.value, 10) || 0 : 0,
+    encoding: currentEncoding(),
   };
   lastHexInput = raw;
   lastSkipBytes = options.skipBytes;
 
   // Use setTimeout to allow the UI to update before heavy work
-    setTimeout(() => {
-      try {
-        const parsed = parseISO8583(raw, options);
-        const presetId = networkPresetSelect?.value || 'none';
-        const validation = validateMessageProfile(parsed, presetId);
-        showOutput(parsed, validation);
-        addToHistory(parsed, raw, options.skipBytes);
-      } catch (err) {
-        alert(`Fatal parse error: ${err.message}`);
-      } finally {
-        btnParse.disabled = false;
+  setTimeout(() => {
+    try {
+      const parsed = parseISO8583(raw, options);
+      const presetId = networkPresetSelect?.value || 'none';
+      const validation = validateMessageProfile(parsed, presetId);
+      showOutput(parsed, validation);
+      addToHistory(parsed, raw, options.skipBytes, options.encoding);
+    } catch (err) {
+      alert(`Fatal parse error: ${err.message}`);
+    } finally {
+      btnParse.disabled = false;
       btnParse.textContent = 'Parse Message';
     }
   }, 10);
@@ -553,7 +690,7 @@ if (networkPresetSelect) {
 }
 
 btnSample.addEventListener('click', () => {
-  hexInput.value = SAMPLE_HEX;
+  hexInput.value = buildSampleHex(currentEncoding());
   skipHeader.checked = false;
 });
 
@@ -575,7 +712,7 @@ importFileInput.addEventListener('change', async () => {
 
   try {
     const json = await readJSONFile(file);
-    const hex  = buildHexFromJSON(json);
+    const hex  = buildHexFromJSON(json, { encoding: currentEncoding() });
     hexInput.value = hex;
     skipHeader.checked = false;
 
@@ -604,21 +741,21 @@ btnCopy.addEventListener('click', async () => {
   }, 2000);
 });
 
-btnShareHex.addEventListener('click', async () => {
+btnShareHex?.addEventListener('click', async () => {
   if (!lastParsed) return;
-  const url = buildShareUrlFromHex(lastHexInput || hexInput.value.trim(), lastSkipBytes || 0);
+  const url = buildShareUrlFromHex(lastHexInput || hexInput.value.trim(), lastSkipBytes || 0, currentEncoding());
   const ok = await copyText(url);
   flashButton(btnShareHex, ok ? 'Copied link' : 'Copy failed', ok);
 });
 
-btnShareJson.addEventListener('click', async () => {
+btnShareJson?.addEventListener('click', async () => {
   if (!lastParsed) return;
-  const url = buildShareUrlFromJSON(lastParsed);
+  const url = buildShareUrlFromJSON(lastParsed, currentEncoding());
   const ok = await copyText(url);
   flashButton(btnShareJson, ok ? 'Copied link' : 'Copy failed', ok);
 });
 
-historyList.addEventListener('click', (e) => {
+historyList?.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-index]');
   if (!btn) return;
   const index = parseInt(btn.dataset.index, 10);
@@ -630,10 +767,11 @@ historyList.addEventListener('click', (e) => {
   const skip = entry.skipBytes || 0;
   skipHeader.checked = skip > 0;
   skipBytes.value = skip;
+  if (entry.encoding && encodingSelect) encodingSelect.value = normalizeEncoding(entry.encoding);
   btnParse.click();
 });
 
-btnClearHistory.addEventListener('click', () => {
+btnClearHistory?.addEventListener('click', () => {
   clearHistory();
 });
 
@@ -653,8 +791,9 @@ if (btnCompare) {
 
     setTimeout(() => {
       try {
-        const parsedA = parseISO8583(hexA, { skipBytes: getSkipValue(compareSkipHeaderA, compareSkipBytesA) });
-        const parsedB = parseISO8583(hexB, { skipBytes: getSkipValue(compareSkipHeaderB, compareSkipBytesB) });
+        const encoding = currentEncoding();
+        const parsedA = parseISO8583(hexA, { skipBytes: getSkipValue(compareSkipHeaderA, compareSkipBytesA), encoding });
+        const parsedB = parseISO8583(hexB, { skipBytes: getSkipValue(compareSkipHeaderB, compareSkipBytesB), encoding });
         renderComparison(compareResult, parsedA, parsedB);
         clearCompareError();
       } catch (err) {
@@ -805,7 +944,6 @@ builderSendToParser.addEventListener('click', () => {
   btnParse.click();
 });
 
-populateFieldSelect();
 builderFieldMeta.textContent = describeField(null);
 renderBuilderFields();
 refreshBuilderOutputs();

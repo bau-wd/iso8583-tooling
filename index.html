@@ -154,6 +154,14 @@
             />
             bytes)
           </label>
+          <label class="select-label">
+            <span>Text Encoding</span>
+            <select id="encodingSelect">
+              <option value="ascii">ASCII (default)</option>
+              <option value="ebcdic">EBCDIC (CP037)</option>
+            </select>
+            <span class="hint-text">Decodes MTI, length prefixes, and text fields.</span>
+          </label>
         </div>
 
         <div class="button-row">
@@ -163,6 +171,47 @@
           <button id="btnClear" class="btn btn-secondary">Clear</button>
         </div>
         <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" />
+      </section>
+
+      <!-- Field Helper -->
+      <section class="card helper-section">
+        <div class="helper-header">
+          <h2>Field Helper</h2>
+          <p class="helper-subtitle">Format hints, allowed lengths, and a live hex preview using your encoding.</p>
+        </div>
+
+        <div class="helper-controls">
+          <label for="fieldSelect">Data Element</label>
+          <select id="fieldSelect"></select>
+          <p class="hint-text">Tip: start typing to jump to a field.</p>
+        </div>
+
+        <div class="helper-grid">
+          <div class="helper-stat">
+            <span class="stat-label">Format</span>
+            <span id="helperFormat" class="stat-value"></span>
+          </div>
+          <div class="helper-stat">
+            <span class="stat-label">Length</span>
+            <span id="helperLength" class="stat-value"></span>
+          </div>
+          <div class="helper-stat">
+            <span class="stat-label">Encoding</span>
+            <span id="helperEncoding" class="stat-value"></span>
+          </div>
+        </div>
+
+        <div class="helper-preview">
+          <div class="helper-preview-row">
+            <span class="stat-label">Example value</span>
+            <code id="helperSample" class="mono helper-code"></code>
+          </div>
+          <div class="helper-preview-row">
+            <span class="stat-label">Wire hex preview</span>
+            <code id="helperHexPreview" class="mono helper-code"></code>
+          </div>
+          <div id="helperHint" class="helper-hint-text"></div>
+        </div>
       </section>
 
       <!-- Output Section -->

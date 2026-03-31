@@ -1,4 +1,5 @@
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
+import { byteLength, normalizeEncoding, textToHex } from './encoding.js';
 
 /**
  * Reconstructs a hex-encoded ISO 8583 message from the minimal JSON format:
@@ -10,7 +11,7 @@ import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
  * @param {object} parsed
  * @returns {string} Uppercase hex string
  */
-export function buildHexFromJSON(parsed) {
+export function buildHexFromJSON(parsed, options = {}) {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Invalid input: expected a JSON object.');
   }
@@ -18,11 +19,12 @@ export function buildHexFromJSON(parsed) {
   if (!mti || !fields) {
     throw new Error('Invalid ISO 8583 JSON: missing required properties (mti, fields).');
   }
+  const encoding = normalizeEncoding(options.encoding);
 
   const sortedDEs = Object.keys(fields).map(Number).sort((a, b) => a - b);
   const { primaryBitmap, secondaryBitmap } = computeBitmaps(sortedDEs);
 
-  let hex = asciiToHex(mti);
+  let hex = textToHex(mti, encoding);
   hex += primaryBitmap;
   if (secondaryBitmap) hex += secondaryBitmap;
 
@@ -31,7 +33,7 @@ export function buildHexFromJSON(parsed) {
     const def   = FIELD_DEFINITIONS[de];
     if (!def)        throw new Error(`DE${de}: No field definition found.`);
     if (value == null) throw new Error(`DE${de}: missing value in JSON.`);
-    hex += buildFieldHex(String(value), def);
+    hex += buildFieldHex(String(value), def, encoding);
   }
 
   return hex;
@@ -88,19 +90,13 @@ export function computeBitmaps(deNumbers) {
   };
 }
 
-function asciiToHex(str) {
-  return Array.from(str)
-    .map(c => c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())
-    .join('');
-}
-
 /**
  * Encodes a field value string into its wire-format hex:
  *   - binary fields (format 'b'): value is already hex
- *   - all other fields: ASCII text → hex pairs
+ *   - all other fields: text → hex pairs using the selected encoding
  * Prepends LLVAR/LLLVAR length prefix where required.
  */
-function buildFieldHex(value, def) {
+function buildFieldHex(value, def, encoding) {
   const isBinary = def.format === 'b';
 
   // Fixed-length fields must be padded to exactly maxLength on the wire.
@@ -115,14 +111,14 @@ function buildFieldHex(value, def) {
     }
   }
 
-  const rawHex = isBinary ? value.toUpperCase() : asciiToHex(encodedValue);
-  const length = isBinary ? rawHex.length / 2 : encodedValue.length;
+  const rawHex = isBinary ? value.toUpperCase() : textToHex(encodedValue, encoding);
+  const byteLen = isBinary ? rawHex.length / 2 : byteLength(encodedValue, encoding);
 
   if (def.lengthType === 'LLVAR') {
-    return asciiToHex(String(value.length).padStart(2, '0')) + rawHex;
+    return textToHex(String(byteLen).padStart(2, '0'), encoding) + rawHex;
   }
   if (def.lengthType === 'LLLVAR') {
-    return asciiToHex(String(value.length).padStart(3, '0')) + rawHex;
+    return textToHex(String(byteLen).padStart(3, '0'), encoding) + rawHex;
   }
   return rawHex;
 }

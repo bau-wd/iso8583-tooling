@@ -14,6 +14,8 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 - 🧭 **Message history** — recent parses are stored locally and can be reloaded with one click
 - 🔗 **Shareable links** — share hex or JSON payloads via URL for easy collaboration
 - ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
+- 🧭 **Field helper** — per-DE dropdown with format hints and live hex previews
+- 🌐 **Alternate encodings** — parse/build text fields as ASCII or EBCDIC (CP037)
 - 🧰 **CLI parity** — parse, export, and build messages from the terminal
 - 📦 **Zero backend** — runs entirely in the browser
 - 🎨 **Color-coded fields** by category (card data, auth data, private data)
@@ -76,24 +78,23 @@ Supported commands mirror the web UI features:
 
 ## How to Use
 
-1. *(Optional)* Use the **Message Builder**: choose MTI, add data elements, and click **Load Into Parser** to populate the parser input.
-2. Or **Paste** your hex-encoded ISO 8583 message into the textarea.  
-   *(Click **Load Sample** to use the built-in demo message.)*
-3. *(Optional)* Check **Skip length header** and enter the number of bytes to skip at the start (e.g. `2` for a 2-byte TPDU header).
-4. Click **Parse Message**.
-5. The tool displays:
+1. *(Optional)* Use the **Message Builder**: choose MTI, add data elements, and click **Load Into Parser** to populate the parser input. Builder output respects the selected text encoding.
+2. Or **Paste** your hex-encoded ISO 8583 message into the textarea. *(Click **Load Sample** to use the built-in demo message.)*
+3. Choose the **text encoding** for MTI and text fields (ASCII by default; EBCDIC CP037 supported), and optionally check **Skip length header** to skip leading bytes (e.g. `2` for a 2-byte TPDU header).
+4. Click **Parse Message**. The tool displays:
    - MTI badge
    - Primary (and secondary) bitmap hex values
    - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
+5. Use the **Field Helper** panel to inspect any DE’s format/length rules and see a hex preview for the selected encoding.
 6. Click **Export JSON** to download the parsed result as a `.json` file.
-7. Use **Copy Hex Link** or **Copy JSON Link** to generate a shareable URL that preloads the message.
+7. Use **Copy Hex Link** or **Copy JSON Link** to generate a shareable URL that preloads the message (encoding and skip options included).
 8. Recent messages appear in **History**; click **Load** to repopulate the input instantly.
 
 ---
 
 ## Sample ISO 8583:1993 Message
 
-The following is a hand-crafted ASCII-encoded ISO 8583:1993 0200 Authorization Request. Click **Load Sample** in the app to use it directly.
+The following is a hand-crafted ISO 8583:1993 0200 Authorization Request. Click **Load Sample** in the app to use it directly; it will be encoded with your currently selected character set (ASCII by default).
 
 Fields present: DE02 (PAN), DE03 (Processing Code), DE04 (Amount), DE07 (Transmission Date & Time), DE11 (STAN), DE12 (Local Time), DE13 (Local Date), DE22 (POS Entry Mode), DE25 (POS Condition Code), DE35 (Track 2), DE41 (Terminal ID), DE42 (Card Acceptor ID), DE49 (Currency Code).
 

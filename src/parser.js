@@ -1,4 +1,5 @@
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
+import { hexToText, normalizeEncoding } from './encoding.js';
 
 /**
  * Parses bits from an 8-byte (16 hex char) bitmap string.
@@ -19,10 +20,10 @@ function parseBitmap(hexBitmap, offset = 0) {
 
 /**
  * Reads characters from the hex string cursor position.
- * For text fields: 1 char = 2 hex chars (ASCII).
+ * For text fields: decoding respects the selected encoding (default ASCII).
  * For binary fields: maxLength bytes = maxLength*2 hex chars.
  */
-function readField(hex, cursor, def) {
+function readField(hex, cursor, def, encoding) {
   const isBinary = def.format === 'b';
   let length;
   let prefixLen = 0;
@@ -31,16 +32,16 @@ function readField(hex, cursor, def) {
     length = isBinary ? def.maxLength * 2 : def.maxLength * 2; // always hex pairs
   } else if (def.lengthType === 'LLVAR') {
     prefixLen = 4; // 2 ASCII chars = 4 hex chars
-    const lenStr = hexToAscii(hex.slice(cursor, cursor + 4));
+    const lenStr = hexToText(hex.slice(cursor, cursor + 4), encoding);
     length = parseInt(lenStr, 10) * 2;
   } else if (def.lengthType === 'LLLVAR') {
     prefixLen = 6; // 3 ASCII chars = 6 hex chars
-    const lenStr = hexToAscii(hex.slice(cursor, cursor + 6));
+    const lenStr = hexToText(hex.slice(cursor, cursor + 6), encoding);
     length = parseInt(lenStr, 10) * 2;
   }
 
   const rawHex = hex.slice(cursor + prefixLen, cursor + prefixLen + length);
-  const value = isBinary ? rawHex : hexToAscii(rawHex);
+  const value = isBinary ? rawHex : hexToText(rawHex, encoding);
   const charLength = length / 2;
 
   return {
@@ -49,17 +50,6 @@ function readField(hex, cursor, def) {
     length: charLength,
     consumed: prefixLen + length,
   };
-}
-
-/**
- * Converts a hex string to ASCII text.
- */
-function hexToAscii(hex) {
-  let result = '';
-  for (let i = 0; i < hex.length; i += 2) {
-    result += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
-  }
-  return result;
 }
 
 /**
@@ -73,6 +63,7 @@ function hexToAscii(hex) {
 export function parseISO8583(rawHex, options = {}) {
   const errors = [];
   const fields = {};
+  const encoding = normalizeEncoding(options.encoding);
 
   // Normalize: strip spaces, uppercase
   const hex = rawHex.replace(/\s+/g, '').toUpperCase();
@@ -86,7 +77,7 @@ export function parseISO8583(rawHex, options = {}) {
     return { mti: null, primaryBitmap: null, secondaryBitmap: null, fields, errors: ['Message too short to contain MTI'] };
   }
   const mtiHex = hex.slice(cursor, cursor + 8);
-  const mti = hexToAscii(mtiHex);
+  const mti = hexToText(mtiHex, encoding);
   cursor += 8;
 
   // ── Primary Bitmap ───────────────────────────────���───────────
@@ -123,7 +114,7 @@ export function parseISO8583(rawHex, options = {}) {
     }
 
     try {
-      const result = readField(hex, cursor, def);
+      const result = readField(hex, cursor, def, encoding);
       fields[de] = {
         de,
         name: def.name,
