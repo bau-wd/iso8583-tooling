@@ -11,6 +11,8 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 - 🗺 **Bitmap decoding** — primary and secondary bitmaps parsed automatically
 - 📤 **Export to JSON** — download the parsed message as a `.json` file
 - ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
+- 🧭 **Field helper** — per-DE dropdown with format hints and live hex previews
+- 🌐 **Alternate encodings** — parse/build text fields as ASCII or EBCDIC (CP037)
 - 📦 **Zero backend** — runs entirely in the browser
 - 🎨 **Color-coded fields** by category (card data, auth data, private data)
 
@@ -47,19 +49,20 @@ npm run preview
 
 1. **Paste** your hex-encoded ISO 8583 message into the textarea.  
    *(Or click **Load Sample** to use the built-in demo message.)*
-2. *(Optional)* Check **Skip length header** and enter the number of bytes to skip at the start (e.g. `2` for a 2-byte TPDU header).
+2. Choose the **text encoding** for MTI and text fields (ASCII by default; EBCDIC CP037 supported) and optionally check **Skip length header** to skip leading bytes (e.g. `2` for a 2-byte TPDU header).
 3. Click **Parse Message**.
 4. The tool displays:
    - MTI badge
    - Primary (and secondary) bitmap hex values
    - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
-5. Click **Export JSON** to download the parsed result as a `.json` file.
+5. Use the **Field Helper** panel to inspect any DE’s format/length rules and see a hex preview for the selected encoding.
+6. Click **Export JSON** to download the parsed result as a `.json` file.
 
 ---
 
 ## Sample ISO 8583:1993 Message
 
-The following is a hand-crafted ASCII-encoded ISO 8583:1993 0200 Authorization Request. Click **Load Sample** in the app to use it directly.
+The following is a hand-crafted ISO 8583:1993 0200 Authorization Request. Click **Load Sample** in the app to use it directly; it will be encoded with your currently selected character set (ASCII by default).
 
 Fields present: DE02 (PAN), DE03 (Processing Code), DE04 (Amount), DE07 (Transmission Date & Time), DE11 (STAN), DE12 (Local Time), DE13 (Local Date), DE22 (POS Entry Mode), DE25 (POS Condition Code), DE35 (Track 2), DE41 (Terminal ID), DE42 (Card Acceptor ID), DE49 (Currency Code).
 

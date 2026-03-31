@@ -101,12 +101,25 @@ input[type='number'] {
   border-radius: 4px;
   color: var(--color-text);
 }
+select {
+  font-size: .9rem;
+  padding: .4rem .65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  color: var(--color-text);
+}
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: #fff;
+}
 
 /* ── Options row ─────────────────────────────────────────────── */
 .options-row {
   margin-top: .75rem;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: .5rem;
   flex-wrap: wrap;
 }
@@ -119,6 +132,18 @@ input[type='number'] {
   cursor: pointer;
 }
 .checkbox-label input[type='checkbox'] { width: 1rem; height: 1rem; cursor: pointer; }
+.select-label {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.hint-text {
+  color: var(--color-muted);
+  font-size: .8rem;
+}
 
 /* ── Button row ──────────────────────────────────────────────── */
 .button-row {
@@ -195,6 +220,36 @@ input[type='number'] {
 
 /* ── Output actions ──────────────────────────────────────────── */
 .output-actions { margin-bottom: 1rem; }
+
+/* ── Helper section ─────────────────────────────────────────--- */
+.helper-section { display: flex; flex-direction: column; gap: .75rem; }
+.helper-header { display: flex; flex-direction: column; gap: .25rem; }
+.helper-subtitle { color: var(--color-muted); font-size: .9rem; line-height: 1.4; }
+.helper-controls { display: flex; flex-direction: column; gap: .35rem; }
+.helper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .75rem;
+}
+.helper-stat {
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: .75rem;
+}
+.stat-label { font-size: .8rem; color: var(--color-muted); text-transform: uppercase; letter-spacing: .04em; }
+.stat-value { font-weight: 700; font-size: 1rem; color: var(--color-text); }
+.helper-preview { display: flex; flex-direction: column; gap: .6rem; }
+.helper-preview-row { display: flex; flex-direction: column; gap: .25rem; }
+.helper-code {
+  background: #0f172a0a;
+  border: 1px solid var(--color-border);
+  padding: .45rem .6rem;
+  border-radius: var(--radius);
+  width: 100%;
+  display: block;
+}
+.helper-hint-text { color: var(--color-muted); font-size: .9rem; }
 
 /* ── Table ───────────────────────────────────────────────────── */
 .field-table {
