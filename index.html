@@ -22,6 +22,11 @@
             <h2>Message Builder</h2>
             <p class="helper-text">Compose an ISO 8583 message visually. Enter MTI and data elements and we will build the bitmap and hex for you.</p>
           </div>
+          <div class="builder-preset">
+            <label for="builderNetworkPreset">Network preset</label>
+            <select id="builderNetworkPreset" class="text-input"></select>
+            <p class="helper-text small">We will flag missing required fields for the selected network.</p>
+          </div>
         </div>
 
         <div class="builder-grid">
@@ -74,6 +79,10 @@
               <span class="label">Secondary Bitmap</span>
               <code id="builderSecondaryBitmap" class="mono"></code>
             </div>
+            <div class="summary-item">
+              <span class="label">Network Validation</span>
+              <span id="builderProfileStatus" class="badge badge-neutral">Validation off</span>
+            </div>
           </div>
 
           <table class="field-table builder-table">
@@ -123,6 +132,14 @@
           spellcheck="false"
         ></textarea>
 
+        <div class="options-row preset-row">
+          <div>
+            <label for="networkPreset">Network preset</label>
+            <select id="networkPreset" class="text-input"></select>
+            <p class="helper-text small">Validation rules from this preset are applied after parsing.</p>
+          </div>
+        </div>
+
         <div class="options-row">
           <label class="checkbox-label">
             <input type="checkbox" id="skipHeader" />
@@ -168,6 +185,11 @@
           <div class="summary-item">
             <span class="label">Fields Present</span>
             <span id="fieldCount" class="badge badge-count"></span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Network Profile</span>
+            <span id="profileBadge" class="badge badge-neutral">No preset</span>
+            <span id="profileStatus" class="helper-text small muted"></span>
           </div>
         </div>
 

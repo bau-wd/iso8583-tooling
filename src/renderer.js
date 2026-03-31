@@ -24,19 +24,29 @@ function esc(str) {
  *
  * @param {HTMLElement} container
  * @param {{ mti, primaryBitmap, secondaryBitmap, fields, errors }} parsedMessage
+ * @param {{ profile, errors: string[], warnings: string[] }} [validation]
  */
-export function renderMessage(container, parsedMessage) {
+export function renderMessage(container, parsedMessage, validation) {
   container.innerHTML = '';
 
   const { mti, primaryBitmap, secondaryBitmap, fields, errors } = parsedMessage;
 
   // ── Error banner ─────────────────────────────────────────────
   const errorBanner = document.getElementById('errorBanner');
-  if (errors && errors.length > 0) {
+  const parseWarnings = errors || [];
+  const validationErrors = validation?.errors || [];
+  const validationWarnings = validation?.warnings || [];
+  const bannerMessages = [
+    ...parseWarnings.map(e => `Parse: ${e}`),
+    ...validationErrors,
+    ...validationWarnings,
+  ];
+
+  if (bannerMessages.length > 0) {
     errorBanner.classList.remove('hidden');
     errorBanner.innerHTML =
-      `<strong>⚠ ${errors.length} parse warning(s):</strong><ul>` +
-      errors.map(e => `<li>${esc(e)}</li>`).join('') +
+      `<strong>⚠ ${bannerMessages.length} issue${bannerMessages.length === 1 ? '' : 's'}:</strong><ul>` +
+      bannerMessages.map(e => `<li>${esc(e)}</li>`).join('') +
       '</ul>';
   } else {
     errorBanner.classList.add('hidden');
