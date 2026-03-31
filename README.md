@@ -6,13 +6,20 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 
 ## Features
 
+- 🛠 **Message Builder** — compose MTI + data elements visually and auto-generate hex/JSON
 - 🔍 **Parse** hex-encoded ISO 8583:1993 messages in the browser
 - 🗂 **Visualize** all data elements (DE1–DE128) in a structured, color-coded table
 - 🗺 **Bitmap decoding** — primary and secondary bitmaps parsed automatically
 - 📤 **Export to JSON** — download the parsed message as a `.json` file
+- 🧭 **Message history** — recent parses are stored locally and can be reloaded with one click
+- 🔗 **Shareable links** — share hex or JSON payloads via URL for easy collaboration
 - ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
+<<<<<<< HEAD
 - 🧭 **Field helper** — per-DE dropdown with format hints and live hex previews
 - 🌐 **Alternate encodings** — parse/build text fields as ASCII or EBCDIC (CP037)
+=======
+- 🧰 **CLI parity** — parse, export, and build messages from the terminal
+>>>>>>> main
 - 📦 **Zero backend** — runs entirely in the browser
 - 🎨 **Color-coded fields** by category (card data, auth data, private data)
 
@@ -45,8 +52,36 @@ npm run preview
 
 ---
 
+## CLI Usage
+
+Install dependencies first (`npm install`), then run the CLI through `npm`:
+
+```bash
+npm run cli -- <command> [options]
+# or directly
+node ./src/cli.js <command> [options]
+```
+
+Supported commands mirror the web UI features:
+
+- **Parse hex to JSON/table (skip headers supported)**  
+  `npm run cli -- parse --hex "<hex>" --skip-bytes 2 --json`  
+  `npm run cli -- parse --file message.hex --out parsed.json --json`
+
+- **Build hex from a UI-style JSON payload**  
+  `npm run cli -- build --file payload.json --out message.hex --summarize`
+
+- **Get the built-in sample message**  
+  `npm run cli -- sample --summarize`  
+  `npm run cli -- sample --json > sample.json`
+
+`--json` writes the same minimal export produced by the UI; `--summarize` additionally prints the parsed table view. Use `--out` to write results to a file.
+
+---
+
 ## How to Use
 
+<<<<<<< HEAD
 1. **Paste** your hex-encoded ISO 8583 message into the textarea.  
    *(Or click **Load Sample** to use the built-in demo message.)*
 2. Choose the **text encoding** for MTI and text fields (ASCII by default; EBCDIC CP037 supported) and optionally check **Skip length header** to skip leading bytes (e.g. `2` for a 2-byte TPDU header).
@@ -57,6 +92,20 @@ npm run preview
    - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
 5. Use the **Field Helper** panel to inspect any DE’s format/length rules and see a hex preview for the selected encoding.
 6. Click **Export JSON** to download the parsed result as a `.json` file.
+=======
+1. *(Optional)* Use the **Message Builder**: choose MTI, add data elements, and click **Load Into Parser** to populate the parser input.
+2. Or **Paste** your hex-encoded ISO 8583 message into the textarea.  
+   *(Click **Load Sample** to use the built-in demo message.)*
+3. *(Optional)* Check **Skip length header** and enter the number of bytes to skip at the start (e.g. `2` for a 2-byte TPDU header).
+4. Click **Parse Message**.
+5. The tool displays:
+   - MTI badge
+   - Primary (and secondary) bitmap hex values
+   - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
+6. Click **Export JSON** to download the parsed result as a `.json` file.
+7. Use **Copy Hex Link** or **Copy JSON Link** to generate a shareable URL that preloads the message.
+8. Recent messages appear in **History**; click **Load** to repopulate the input instantly.
+>>>>>>> main
 
 ---
 

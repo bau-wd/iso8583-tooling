@@ -15,6 +15,112 @@
     </header>
 
     <main>
+      <!-- Message Builder -->
+      <section class="card builder-section">
+        <div class="builder-header">
+          <div>
+            <h2>Message Builder</h2>
+            <p class="helper-text">Compose an ISO 8583 message visually. Enter MTI and data elements and we will build the bitmap and hex for you.</p>
+          </div>
+          <div class="builder-preset">
+            <label for="builderNetworkPreset">Network preset</label>
+            <select id="builderNetworkPreset" class="text-input"></select>
+            <p class="helper-text small">We will flag missing required fields for the selected network.</p>
+          </div>
+        </div>
+
+        <div class="builder-grid">
+          <div class="builder-block">
+            <label for="builderMti">Message Type Indicator (MTI)</label>
+            <input
+              id="builderMti"
+              class="text-input"
+              type="text"
+              maxlength="4"
+              placeholder="0200"
+              value="0200"
+              spellcheck="false"
+            />
+            <p class="helper-text">4 characters, e.g. 0100 (auth request), 0210 (response).</p>
+          </div>
+
+          <div class="builder-block">
+            <label for="builderFieldSelect">Add Data Element</label>
+            <select id="builderFieldSelect" class="text-input"></select>
+            <div id="builderFieldMeta" class="helper-text">Choose a data element to see its format and length.</div>
+
+            <label for="builderFieldValue" style="margin-top: .75rem;">Value</label>
+            <input
+              id="builderFieldValue"
+              class="text-input"
+              type="text"
+              placeholder="Enter value for the selected DE"
+              spellcheck="false"
+            />
+
+            <div class="button-row" style="margin-top: .75rem;">
+              <button id="builderAddField" class="btn btn-primary">Add / Update Field</button>
+              <button id="builderClearFields" class="btn btn-secondary">Clear Fields</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="builder-table-wrapper">
+          <div class="builder-summary">
+            <div class="summary-item">
+              <span class="label">Fields Selected</span>
+              <span id="builderFieldCount" class="badge badge-count"></span>
+            </div>
+            <div class="summary-item">
+              <span class="label">Primary Bitmap</span>
+              <code id="builderPrimaryBitmap" class="mono"></code>
+            </div>
+            <div class="summary-item">
+              <span class="label">Secondary Bitmap</span>
+              <code id="builderSecondaryBitmap" class="mono"></code>
+            </div>
+            <div class="summary-item">
+              <span class="label">Network Validation</span>
+              <span id="builderProfileStatus" class="badge badge-neutral">Validation off</span>
+            </div>
+          </div>
+
+          <table class="field-table builder-table">
+            <thead>
+              <tr>
+                <th>DE #</th>
+                <th>Field Name</th>
+                <th>Format / Length</th>
+                <th>Value</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="builderFieldTableBody"></tbody>
+          </table>
+        </div>
+
+        <div id="builderErrorBox" class="error-banner hidden"></div>
+
+        <div class="builder-output">
+          <div class="builder-output-group">
+            <label for="builderHexOutput">Generated Hex</label>
+            <textarea id="builderHexOutput" class="mono" rows="3" readonly spellcheck="false"></textarea>
+            <div class="button-row">
+              <button id="builderCopyHex" class="btn btn-secondary">Copy Hex</button>
+              <button id="builderSendToParser" class="btn btn-primary">Load Into Parser</button>
+            </div>
+          </div>
+          <div class="builder-output-group">
+            <label for="builderJsonOutput">JSON Payload</label>
+            <textarea id="builderJsonOutput" class="mono" rows="5" readonly spellcheck="false"></textarea>
+            <div class="button-row">
+              <button id="builderCopyJson" class="btn btn-secondary">Copy JSON</button>
+              <button id="builderDownloadJson" class="btn btn-secondary">Download JSON</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Input Section -->
       <section class="card input-section">
         <h2>Input</h2>
@@ -25,6 +131,14 @@
           rows="5"
           spellcheck="false"
         ></textarea>
+
+        <div class="options-row preset-row">
+          <div>
+            <label for="networkPreset">Network preset</label>
+            <select id="networkPreset" class="text-input"></select>
+            <p class="helper-text small">Validation rules from this preset are applied after parsing.</p>
+          </div>
+        </div>
 
         <div class="options-row">
           <label class="checkbox-label">
@@ -121,14 +235,115 @@
             <span class="label">Fields Present</span>
             <span id="fieldCount" class="badge badge-count"></span>
           </div>
+          <div class="summary-item">
+            <span class="label">Network Profile</span>
+            <span id="profileBadge" class="badge badge-neutral">No preset</span>
+            <span id="profileStatus" class="helper-text small muted"></span>
+          </div>
         </div>
 
         <div class="output-actions">
           <button id="btnExport" class="btn btn-primary">Export JSON</button>
           <button id="btnCopy" class="btn btn-secondary">Copy JSON</button>
+          <button id="btnShareHex" class="btn btn-secondary">Copy Hex Link</button>
+          <button id="btnShareJson" class="btn btn-secondary">Copy JSON Link</button>
         </div>
 
         <div id="tableContainer"></div>
+      </section>
+
+      <!-- Compare Section -->
+      <section class="card compare-section">
+        <div class="compare-header">
+          <div>
+            <h2>Compare & Diff</h2>
+            <p class="helper-text">Compare two ISO 8583 hex messages side-by-side. Differences are highlighted at the field level and bitmap deltas are summarized.</p>
+          </div>
+          <div class="compare-actions">
+            <button id="btnSwapCompare" class="btn btn-secondary btn-sm">Swap A ↔ B</button>
+          </div>
+        </div>
+
+        <div class="compare-grid">
+          <div class="compare-pane">
+            <div class="pane-title">Message A</div>
+            <label for="compareInputA">Hex Message</label>
+            <textarea
+              id="compareInputA"
+              placeholder="Paste hex for message A…"
+              rows="4"
+              spellcheck="false"
+            ></textarea>
+
+            <div class="options-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="compareSkipHeaderA" />
+                Skip length header (first
+                <input
+                  type="number"
+                  id="compareSkipBytesA"
+                  value="2"
+                  min="0"
+                  max="8"
+                  style="width: 3.5rem"
+                />
+                bytes)
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button id="btnUseCurrentA" class="btn btn-secondary btn-sm">Use last parsed</button>
+            </div>
+          </div>
+
+          <div class="compare-pane">
+            <div class="pane-title">Message B</div>
+            <label for="compareInputB">Hex Message</label>
+            <textarea
+              id="compareInputB"
+              placeholder="Paste hex for message B…"
+              rows="4"
+              spellcheck="false"
+            ></textarea>
+
+            <div class="options-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="compareSkipHeaderB" />
+                Skip length header (first
+                <input
+                  type="number"
+                  id="compareSkipBytesB"
+                  value="2"
+                  min="0"
+                  max="8"
+                  style="width: 3.5rem"
+                />
+                bytes)
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button id="btnUseCurrentB" class="btn btn-secondary btn-sm">Use last parsed</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="btnCompare" class="btn btn-primary">Compare Messages</button>
+        </div>
+
+        <div id="compareError" class="error-banner hidden"></div>
+        <div id="compareResult" class="compare-result"></div>
+      </section>
+
+      <!-- History Section -->
+      <section class="card history-section">
+        <div class="history-header">
+          <h2>History</h2>
+          <button id="btnClearHistory" class="btn btn-secondary btn-sm">Clear</button>
+        </div>
+        <p class="helper-text">Recently parsed or rebuilt messages (stored locally in your browser).</p>
+        <ul id="historyList" class="history-list"></ul>
       </section>
     </main>
 
