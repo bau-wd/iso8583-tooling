@@ -11,6 +11,7 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 - 🗺 **Bitmap decoding** — primary and secondary bitmaps parsed automatically
 - 📤 **Export to JSON** — download the parsed message as a `.json` file
 - ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
+- 🧰 **CLI parity** — parse, export, and build messages from the terminal
 - 📦 **Zero backend** — runs entirely in the browser
 - 🎨 **Color-coded fields** by category (card data, auth data, private data)
 
@@ -40,6 +41,33 @@ npm run build
 # output in dist/
 npm run preview
 ```
+
+---
+
+## CLI Usage
+
+Install dependencies first (`npm install`), then run the CLI through `npm`:
+
+```bash
+npm run cli -- <command> [options]
+# or directly
+node ./src/cli.js <command> [options]
+```
+
+Supported commands mirror the web UI features:
+
+- **Parse hex to JSON/table (skip headers supported)**  
+  `npm run cli -- parse --hex "<hex>" --skip-bytes 2 --json`  
+  `npm run cli -- parse --file message.hex --out parsed.json --json`
+
+- **Build hex from a UI-style JSON payload**  
+  `npm run cli -- build --file payload.json --out message.hex --summarize`
+
+- **Get the built-in sample message**  
+  `npm run cli -- sample --summarize`  
+  `npm run cli -- sample --json > sample.json`
+
+`--json` writes the same minimal export produced by the UI; `--summarize` additionally prints the parsed table view. Use `--out` to write results to a file.
 
 ---
 

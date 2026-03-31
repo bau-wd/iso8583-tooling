@@ -3,58 +3,7 @@ import { renderMessage } from './renderer.js';
 import { downloadJSON, copyJSONToClipboard } from './exporter.js';
 import { buildHexFromJSON, readJSONFile, computeBitmaps } from './importer.js';
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
-
-// ── Sample 0200 Authorization Request ────────────────────────────────────────
-//
-// This is a hand-crafted, ASCII-encoded ISO 8583:1993 message.
-//
-// MTI:  0200
-// Bitmap (primary):   7238000102C08000
-//   Bits set: 2,3,4,7,11,12,13,22,25,35,41,42,49
-// Bitmap (secondary): 4000000000000000
-//   Bits set: 66... wait — bit 1 is NOT set in primary → no secondary bitmap.
-//
-// Fields present (bits set in 7238000102C08000):
-//   Bit  2 → DE02  LLVAR  n19  PAN                 → "16" + "4111111111111111"
-//   Bit  3 → DE03  fixed  n6   Processing Code     → "000000"
-//   Bit  4 → DE04  fixed  n12  Amount              → "000000012345"
-//   Bit  7 → DE07  fixed  n10  Trans Date & Time   → "0311101526"
-//   Bit 11 → DE11  fixed  n6   STAN                → "000001"
-//   Bit 12 → DE12  fixed  n6   Local Time          → "101526"
-//   Bit 13 → DE13  fixed  n4   Local Date          → "0311"
-//   Bit 22 → DE22  fixed  n3   POS Entry Mode      → "012"
-//   Bit 25 → DE25  fixed  n2   POS Condition Code  → "00"
-//   Bit 35 → DE35  LLVAR  z37  Track 2             → "37" + "4111111111111111=2512101000000000000"
-//   Bit 41 → DE41  fixed  ans8 Terminal ID         → "TERM0001"
-//   Bit 42 → DE42  fixed  ans15 Card Acceptor ID   → "MERCHANT000001 "
-//   Bit 49 → DE49  fixed  an3  Currency Code       → "978" (EUR)
-//
-// All text fields are ASCII-encoded as hex pairs.
-
-function buildSampleHex() {
-  const enc = (s) => Array.from(s).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('').toUpperCase();
-
-  const mti        = enc('0200');
-  const bitmap     = '7238000102C08000';
-  const de02       = enc('16') + enc('4111111111111111');
-  const de03       = enc('000000');
-  const de04       = enc('000000012345');
-  const de07       = enc('0311101526');
-  const de11       = enc('000001');
-  const de12       = enc('101526');
-  const de13       = enc('0311');
-  const de22       = enc('012');
-  const de25       = enc('00');
-  const track2     = '4111111111111111=2512101000000000000';
-  const de35       = enc(String(track2.length).padStart(2, '0')) + enc(track2);
-  const de41       = enc('TERM0001');
-  const de42       = enc('MERCHANT000001 ');
-  const de49       = enc('978');
-
-  return mti + bitmap + de02 + de03 + de04 + de07 + de11 + de12 + de13 + de22 + de25 + de35 + de41 + de42 + de49;
-}
-
-const SAMPLE_HEX = buildSampleHex();
+import { SAMPLE_HEX } from './sample.js';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const hexInput      = document.getElementById('hexInput');
