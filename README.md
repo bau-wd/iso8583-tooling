@@ -127,6 +127,21 @@ Fields present: DE02 (PAN), DE03 (Processing Code), DE04 (Amount), DE07 (Transmi
 
 ---
 
+## Proposed Enhancements
+
+- **Message builder UI** — form-driven composer to generate MTI/DE values, build the bitmap automatically, and emit ready-to-send hex/JSON.
+- **Profiles & presets** — one-click templates for common networks (Visa, MasterCard, UnionPay), regional variants, and message classes (0200, 0210, 0400, 0420, 0800).
+- **Validation rules** — per-field constraints (length, numeric-only, EMV TLV structure), checksum/Luhn validation for PAN, and auto-padding guidance.
+- **Compare & diff** — side-by-side view of two messages with highlighted field-level differences and bitmap deltas.
+- **History & sharing** — local history of parsed messages, export/import of sessions, and shareable URLs for specific payloads.
+- **Field helpers** — inline hints for processing codes/response codes, friendly decoding for EMV TLV (DE55), and currency/amount formatters.
+- **Alternate encodings** — toggles for ASCII vs. BCD packed numeric fields, optional endianness handling for headers, and binary payload previews.
+- **CLI companion** — node-based CLI to parse/build messages in pipelines or CI, mirroring the browser logic.
+
+Contributions and new ideas are welcome—feel free to open an issue or PR with additional feature requests.
+
+---
+
 ## License
 
 MIT
