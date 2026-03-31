@@ -1,5 +1,5 @@
 import { parseISO8583 } from './parser.js';
-import { renderMessage } from './renderer.js';
+import { renderMessage, renderComparison } from './renderer.js';
 import { downloadJSON, copyJSONToClipboard } from './exporter.js';
 import { buildHexFromJSON, readJSONFile, computeBitmaps } from './importer.js';
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
@@ -27,6 +27,18 @@ const secondaryBitmapValue = document.getElementById('secondaryBitmapValue');
 const secondaryBitmapItem  = document.getElementById('secondaryBitmapItem');
 const fieldCount    = document.getElementById('fieldCount');
 const tableContainer = document.getElementById('tableContainer');
+const compareInputA = document.getElementById('compareInputA');
+const compareInputB = document.getElementById('compareInputB');
+const compareSkipHeaderA = document.getElementById('compareSkipHeaderA');
+const compareSkipHeaderB = document.getElementById('compareSkipHeaderB');
+const compareSkipBytesA = document.getElementById('compareSkipBytesA');
+const compareSkipBytesB = document.getElementById('compareSkipBytesB');
+const btnCompare   = document.getElementById('btnCompare');
+const btnSwapCompare = document.getElementById('btnSwapCompare');
+const btnUseCurrentA = document.getElementById('btnUseCurrentA');
+const btnUseCurrentB = document.getElementById('btnUseCurrentB');
+const compareError = document.getElementById('compareError');
+const compareResult = document.getElementById('compareResult');
 
 // Builder DOM refs
 const builderMtiInput          = document.getElementById('builderMti');
@@ -390,6 +402,22 @@ function buildShareUrlFromJSON(parsed) {
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
+function showCompareError(msg) {
+  if (!compareError) return;
+  compareError.textContent = msg;
+  compareError.classList.remove('hidden');
+}
+
+function clearCompareError() {
+  if (!compareError) return;
+  compareError.classList.add('hidden');
+  compareError.textContent = '';
+}
+
+function getSkipValue(checkbox, input) {
+  return checkbox.checked ? parseInt(input.value, 10) || 0 : 0;
+}
+
 // ── Event listeners ───────────────────────────────────────────────────────────
 btnParse.addEventListener('click', () => {
   const raw = hexInput.value.trim();
@@ -506,6 +534,76 @@ historyList.addEventListener('click', (e) => {
 btnClearHistory.addEventListener('click', () => {
   clearHistory();
 });
+
+// ── Compare & Diff events ─────────────────────────────────────────────────────
+if (btnCompare) {
+  btnCompare.addEventListener('click', () => {
+    const hexA = compareInputA.value.trim();
+    const hexB = compareInputB.value.trim();
+    if (!hexA || !hexB) {
+      showCompareError('Paste a hex message for both A and B before comparing.');
+      return;
+    }
+
+    btnCompare.disabled = true;
+    const original = btnCompare.textContent;
+    btnCompare.textContent = 'Comparing…';
+
+    setTimeout(() => {
+      try {
+        const parsedA = parseISO8583(hexA, { skipBytes: getSkipValue(compareSkipHeaderA, compareSkipBytesA) });
+        const parsedB = parseISO8583(hexB, { skipBytes: getSkipValue(compareSkipHeaderB, compareSkipBytesB) });
+        renderComparison(compareResult, parsedA, parsedB);
+        clearCompareError();
+      } catch (err) {
+        showCompareError(`Compare failed: ${err.message}`);
+        compareResult.innerHTML = '';
+      } finally {
+        btnCompare.disabled = false;
+        btnCompare.textContent = original;
+      }
+    }, 10);
+  });
+}
+
+if (btnSwapCompare) {
+  btnSwapCompare.addEventListener('click', () => {
+    const tmp = compareInputA.value;
+    compareInputA.value = compareInputB.value;
+    compareInputB.value = tmp;
+
+    const tmpSkip = compareSkipHeaderA.checked;
+    compareSkipHeaderA.checked = compareSkipHeaderB.checked;
+    compareSkipHeaderB.checked = tmpSkip;
+
+    const tmpBytes = compareSkipBytesA.value;
+    compareSkipBytesA.value = compareSkipBytesB.value;
+    compareSkipBytesB.value = tmpBytes;
+  });
+}
+
+function loadCurrentInto(targetInput, checkbox, input) {
+  const source = lastHexInput || hexInput.value.trim();
+  if (!source) {
+    alert('Parse a message first to reuse it for comparison.');
+    return;
+  }
+  targetInput.value = source;
+  checkbox.checked = (lastSkipBytes || 0) > 0;
+  input.value = lastSkipBytes || 0;
+}
+
+if (btnUseCurrentA) {
+  btnUseCurrentA.addEventListener('click', () => {
+    loadCurrentInto(compareInputA, compareSkipHeaderA, compareSkipBytesA);
+  });
+}
+
+if (btnUseCurrentB) {
+  btnUseCurrentB.addEventListener('click', () => {
+    loadCurrentInto(compareInputB, compareSkipHeaderB, compareSkipBytesB);
+  });
+}
 
 // ── Builder events ───────────────────────────────────────────────────────────
 builderFieldSelect.addEventListener('change', () => {

@@ -138,3 +138,164 @@ function mtiHexFromMti(mti) {
     .map(c => c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase())
     .join('');
 }
+
+/**
+ * Renders a side-by-side comparison of two parsed ISO 8583 messages.
+ *
+ * @param {HTMLElement} container
+ * @param {object} messageA
+ * @param {object} messageB
+ */
+export function renderComparison(container, messageA, messageB) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  const fieldsA = messageA?.fields || {};
+  const fieldsB = messageB?.fields || {};
+  const allDes = Array.from(
+    new Set([...Object.keys(fieldsA), ...Object.keys(fieldsB)].map(Number))
+  ).sort((a, b) => a - b);
+
+  const onlyA   = allDes.filter(de => fieldsA[de] && !fieldsB[de]);
+  const onlyB   = allDes.filter(de => !fieldsA[de] && fieldsB[de]);
+  const changed = allDes.filter(de => fieldsA[de] && fieldsB[de] && !sameField(fieldsA[de], fieldsB[de]));
+
+  const summaryGrid = document.createElement('div');
+  summaryGrid.className = 'compare-summary-grid';
+  summaryGrid.appendChild(summaryCard('Message A', messageA));
+  summaryGrid.appendChild(summaryCard('Message B', messageB));
+  summaryGrid.appendChild(deltaCard(onlyA, onlyB, changed));
+  container.appendChild(summaryGrid);
+
+  const note = document.createElement('div');
+  note.className = 'compare-note';
+  note.textContent = (changed.length + onlyA.length + onlyB.length) === 0
+    ? 'Messages match across all present data elements.'
+    : 'Differences highlighted below. Bitmaps show elements present only on one side.';
+  container.appendChild(note);
+
+  const table = document.createElement('table');
+  table.className = 'field-table diff-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>DE #</th>
+        <th>Field</th>
+        <th>Message A</th>
+        <th>Message B</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+  `;
+
+  const tbody = document.createElement('tbody');
+  if (allDes.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="5" class="empty">No data elements present in either message.</td>`;
+    tbody.appendChild(tr);
+  } else {
+    for (const de of allDes) {
+      const a = fieldsA[de];
+      const b = fieldsB[de];
+      const status = classifyDiff(a, b);
+      const tr = document.createElement('tr');
+      tr.className = `diff-${status} ${rowClass(de)}`;
+      tr.innerHTML = `
+        <td><span class="de-badge">${esc(de)}</span></td>
+        <td>
+          <div class="field-name">${esc(a?.name || b?.name || 'Unknown')}</div>
+          <div class="field-meta"><code>${esc(a?.format || b?.format || '?')}</code> · ${esc(a?.lengthType || b?.lengthType || '?')}</div>
+        </td>
+        <td>${renderCell(a)}</td>
+        <td>${renderCell(b)}</td>
+        <td><span class="status-badge status-${status}">${statusLabel(status)}</span></td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+function classifyDiff(fieldA, fieldB) {
+  if (fieldA && fieldB) return sameField(fieldA, fieldB) ? 'same' : 'changed';
+  if (fieldA) return 'only-a';
+  return 'only-b';
+}
+
+function sameField(fieldA, fieldB) {
+  return fieldA.value === fieldB.value && fieldA.rawHex === fieldB.rawHex && fieldA.length === fieldB.length;
+}
+
+function renderCell(field) {
+  if (!field) return '<div class="muted">— not present —</div>';
+  return `
+    <div class="value-line"><code>${esc(field.value)}</code></div>
+    <div class="value-meta">
+      <span class="hex">${esc(field.rawHex)}</span>
+      <span class="meta-chip">${esc(field.format)} • ${esc(field.lengthType)} • ${esc(field.length)}</span>
+    </div>
+  `;
+}
+
+function summaryCard(title, parsed) {
+  const fieldCount = Object.keys(parsed?.fields || {}).length;
+  const errors = parsed?.errors || [];
+  const card = document.createElement('div');
+  card.className = 'compare-card';
+  card.innerHTML = `
+    <div class="compare-card-title">${esc(title)}</div>
+    <div class="compare-card-grid">
+      <div>
+        <div class="label">MTI</div>
+        <div class="mono strong">${esc(parsed?.mti ?? '—')}</div>
+      </div>
+      <div>
+        <div class="label">Primary Bitmap</div>
+        <code class="mono">${esc(parsed?.primaryBitmap ?? '—')}</code>
+      </div>
+      <div>
+        <div class="label">Secondary Bitmap</div>
+        <code class="mono">${esc(parsed?.secondaryBitmap ?? '—')}</code>
+      </div>
+      <div>
+        <div class="label">Fields Present</div>
+        <span class="badge badge-count">${fieldCount}</span>
+      </div>
+    </div>
+    ${errors.length ? `<div class="compare-errors">${errors.map(e => `<div>• ${esc(e)}</div>`).join('')}</div>` : ''}
+  `;
+  return card;
+}
+
+function deltaCard(onlyA, onlyB, changed) {
+  const card = document.createElement('div');
+  card.className = 'compare-card delta-card';
+  card.innerHTML = `
+    <div class="compare-card-title">Bitmap Delta</div>
+    ${deltaRow('Only in A', onlyA, 'delta-a')}
+    ${deltaRow('Only in B', onlyB, 'delta-b')}
+    ${deltaRow('Changed Fields', changed, 'delta-changed')}
+  `;
+  return card;
+}
+
+function deltaRow(label, items, cls) {
+  const chips = items.length
+    ? items.map(de => `<span class="tag ${cls}">DE${esc(de)}</span>`).join('')
+    : '<span class="muted">None</span>';
+  return `
+    <div class="delta-row">
+      <span class="delta-label">${esc(label)}</span>
+      <div class="delta-values">${chips}</div>
+    </div>
+  `;
+}
+
+function statusLabel(status) {
+  if (status === 'changed') return 'Changed';
+  if (status === 'only-a') return 'Only A';
+  if (status === 'only-b') return 'Only B';
+  return 'Same';
+}

@@ -181,6 +181,90 @@
         <div id="tableContainer"></div>
       </section>
 
+      <!-- Compare Section -->
+      <section class="card compare-section">
+        <div class="compare-header">
+          <div>
+            <h2>Compare & Diff</h2>
+            <p class="helper-text">Compare two ISO 8583 hex messages side-by-side. Differences are highlighted at the field level and bitmap deltas are summarized.</p>
+          </div>
+          <div class="compare-actions">
+            <button id="btnSwapCompare" class="btn btn-secondary btn-sm">Swap A ↔ B</button>
+          </div>
+        </div>
+
+        <div class="compare-grid">
+          <div class="compare-pane">
+            <div class="pane-title">Message A</div>
+            <label for="compareInputA">Hex Message</label>
+            <textarea
+              id="compareInputA"
+              placeholder="Paste hex for message A…"
+              rows="4"
+              spellcheck="false"
+            ></textarea>
+
+            <div class="options-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="compareSkipHeaderA" />
+                Skip length header (first
+                <input
+                  type="number"
+                  id="compareSkipBytesA"
+                  value="2"
+                  min="0"
+                  max="8"
+                  style="width: 3.5rem"
+                />
+                bytes)
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button id="btnUseCurrentA" class="btn btn-secondary btn-sm">Use last parsed</button>
+            </div>
+          </div>
+
+          <div class="compare-pane">
+            <div class="pane-title">Message B</div>
+            <label for="compareInputB">Hex Message</label>
+            <textarea
+              id="compareInputB"
+              placeholder="Paste hex for message B…"
+              rows="4"
+              spellcheck="false"
+            ></textarea>
+
+            <div class="options-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="compareSkipHeaderB" />
+                Skip length header (first
+                <input
+                  type="number"
+                  id="compareSkipBytesB"
+                  value="2"
+                  min="0"
+                  max="8"
+                  style="width: 3.5rem"
+                />
+                bytes)
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button id="btnUseCurrentB" class="btn btn-secondary btn-sm">Use last parsed</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="btnCompare" class="btn btn-primary">Compare Messages</button>
+        </div>
+
+        <div id="compareError" class="error-banner hidden"></div>
+        <div id="compareResult" class="compare-result"></div>
+      </section>
+
       <!-- History Section -->
       <section class="card history-section">
         <div class="history-header">
