@@ -1,70 +1,13 @@
 import { parseISO8583 } from './parser.js';
 import { renderMessage, renderComparison } from './renderer.js';
 import { downloadJSON, copyJSONToClipboard } from './exporter.js';
-<<<<<<< HEAD
-import { buildHexFromJSON, readJSONFile } from './importer.js';
-import { ENCODING_OPTIONS, encodingLabel, normalizeEncoding, textToHex, byteLength } from './encoding.js';
-import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
-
-const DEFAULT_ENCODING = 'ascii';
-
-// ── Sample 0200 Authorization Request ────────────────────────────────────────
-//
-// This is a hand-crafted ISO 8583:1993 message. Text is encoded using the
-// currently selected encoding (defaults to ASCII).
-//
-// MTI:  0200
-// Bitmap (primary):   7238000102C08000
-//   Bits set: 2,3,4,7,11,12,13,22,25,35,41,42,49
-// Bitmap (secondary): 4000000000000000
-//   Bits set: 66... wait — bit 1 is NOT set in primary → no secondary bitmap.
-//
-// Fields present (bits set in 7238000102C08000):
-//   Bit  2 → DE02  LLVAR  n19  PAN                 → "16" + "4111111111111111"
-//   Bit  3 → DE03  fixed  n6   Processing Code     → "000000"
-//   Bit  4 → DE04  fixed  n12  Amount              → "000000012345"
-//   Bit  7 → DE07  fixed  n10  Trans Date & Time   → "0311101526"
-//   Bit 11 → DE11  fixed  n6   STAN                → "000001"
-//   Bit 12 → DE12  fixed  n6   Local Time          → "101526"
-//   Bit 13 → DE13  fixed  n4   Local Date          → "0311"
-//   Bit 22 → DE22  fixed  n3   POS Entry Mode      → "012"
-//   Bit 25 → DE25  fixed  n2   POS Condition Code  → "00"
-//   Bit 35 → DE35  LLVAR  z37  Track 2             → "37" + "4111111111111111=2512101000000000000"
-//   Bit 41 → DE41  fixed  ans8 Terminal ID         → "TERM0001"
-//   Bit 42 → DE42  fixed  ans15 Card Acceptor ID   → "MERCHANT000001 "
-//   Bit 49 → DE49  fixed  an3  Currency Code       → "978" (EUR)
-//
-// All text fields are encoded as hex pairs using the chosen encoding.
-
-function buildSampleHex(selectedEncoding = DEFAULT_ENCODING) {
-  const encoding = normalizeEncoding(selectedEncoding);
-  const enc = (s) => textToHex(s, encoding);
-
-  const mti        = enc('0200');
-  const bitmap     = '7238000102C08000';
-  const de02       = enc('16') + enc('4111111111111111');
-  const de03       = enc('000000');
-  const de04       = enc('000000012345');
-  const de07       = enc('0311101526');
-  const de11       = enc('000001');
-  const de12       = enc('101526');
-  const de13       = enc('0311');
-  const de22       = enc('012');
-  const de25       = enc('00');
-  const track2     = '4111111111111111=2512101000000000000';
-  const de35       = enc(String(track2.length).padStart(2, '0')) + enc(track2);
-  const de41       = enc('TERM0001');
-  const de42       = enc('MERCHANT000001 ');
-  const de49       = enc('978');
-
-  return mti + bitmap + de02 + de03 + de04 + de07 + de11 + de12 + de13 + de22 + de25 + de35 + de41 + de42 + de49;
-}
-=======
 import { buildHexFromJSON, readJSONFile, computeBitmaps } from './importer.js';
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
 import { NETWORK_PRESETS, validateMessageProfile, findPreset } from './networkProfiles.js';
-import { SAMPLE_HEX } from './sample.js';
->>>>>>> main
+import { SAMPLE_HEX, buildSampleHex } from './sample.js';
+import { ENCODING_OPTIONS, encodingLabel, normalizeEncoding, textToHex, byteLength } from './encoding.js';
+
+const DEFAULT_ENCODING = 'ascii';
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const hexInput      = document.getElementById('hexInput');
@@ -88,16 +31,6 @@ const secondaryBitmapValue = document.getElementById('secondaryBitmapValue');
 const secondaryBitmapItem  = document.getElementById('secondaryBitmapItem');
 const fieldCount    = document.getElementById('fieldCount');
 const tableContainer = document.getElementById('tableContainer');
-<<<<<<< HEAD
-const encodingSelect = document.getElementById('encodingSelect');
-const fieldSelect = document.getElementById('fieldSelect');
-const helperFormat = document.getElementById('helperFormat');
-const helperLength = document.getElementById('helperLength');
-const helperHint = document.getElementById('helperHint');
-const helperSample = document.getElementById('helperSample');
-const helperHexPreview = document.getElementById('helperHexPreview');
-const helperEncoding = document.getElementById('helperEncoding');
-=======
 const compareInputA = document.getElementById('compareInputA');
 const compareInputB = document.getElementById('compareInputB');
 const compareSkipHeaderA = document.getElementById('compareSkipHeaderA');
@@ -113,6 +46,16 @@ const compareResult = document.getElementById('compareResult');
 const networkPresetSelect = document.getElementById('networkPreset');
 const profileBadge = document.getElementById('profileBadge');
 const profileStatus = document.getElementById('profileStatus');
+const encodingSelect = document.getElementById('encodingSelect');
+
+// Field helper refs
+const helperFieldSelect = document.getElementById('fieldSelect');
+const helperFormat = document.getElementById('helperFormat');
+const helperLength = document.getElementById('helperLength');
+const helperHint = document.getElementById('helperHint');
+const helperSample = document.getElementById('helperSample');
+const helperHexPreview = document.getElementById('helperHexPreview');
+const helperEncoding = document.getElementById('helperEncoding');
 
 // Builder DOM refs
 const builderMtiInput          = document.getElementById('builderMti');
@@ -139,14 +82,12 @@ const HISTORY_KEY   = 'iso8583-history';
 const HISTORY_LIMIT = 10;
 
 const builderState = { fields: {} };
->>>>>>> main
 
 let lastParsed = null;
 let lastHexInput = '';
 let lastSkipBytes = 0;
 
-<<<<<<< HEAD
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Encoding helpers ─────────────────────────────────────────────────────────
 function currentEncoding() {
   return normalizeEncoding(encodingSelect?.value || DEFAULT_ENCODING);
 }
@@ -159,18 +100,7 @@ function populateEncodingSelect() {
   encodingSelect.value = DEFAULT_ENCODING;
 }
 
-function populateFieldSelect() {
-  if (!fieldSelect) return;
-  const entries = Object.keys(FIELD_DEFINITIONS).map(Number).sort((a, b) => a - b);
-  fieldSelect.innerHTML = entries
-    .map(de => {
-      const def = FIELD_DEFINITIONS[de];
-      return `<option value="${de}">DE${String(de).padStart(3, '0')} — ${def.name}</option>`;
-    })
-    .join('');
-  fieldSelect.value = '2';
-}
-
+// ── Field helper (UI) ───────────────────────────────────────────────────────
 function formatDescription(format) {
   switch (format) {
     case 'n': return 'Numeric (digits only)';
@@ -201,9 +131,21 @@ function sampleValueFor(def) {
   return 'SAMPLE'.padEnd(Math.max(1, Math.min(safeLen, 6)), 'X').slice(0, safeLen);
 }
 
+function populateHelperFieldSelect() {
+  if (!helperFieldSelect) return;
+  const entries = Object.keys(FIELD_DEFINITIONS).map(Number).sort((a, b) => a - b);
+  helperFieldSelect.innerHTML = entries
+    .map(de => {
+      const def = FIELD_DEFINITIONS[de];
+      return `<option value="${de}">DE${String(de).padStart(3, '0')} — ${def.name}</option>`;
+    })
+    .join('');
+  helperFieldSelect.value = '2';
+}
+
 function updateFieldHelper() {
-  if (!fieldSelect || !helperFormat || !helperLength || !helperHint) return;
-  const selected = Number(fieldSelect.value || 2);
+  if (!helperFieldSelect || !helperFormat || !helperLength || !helperHint) return;
+  const selected = Number(helperFieldSelect.value || 2);
   const def = FIELD_DEFINITIONS[selected] || FIELD_DEFINITIONS[2];
   const encoding = currentEncoding();
 
@@ -240,11 +182,8 @@ function updateFieldHelper() {
   }
 }
 
-function showOutput(parsed) {
-=======
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Parser helpers ───────────────────────────────────────────────────────────
 function showOutput(parsed, validation) {
->>>>>>> main
   lastParsed = parsed;
 
   mtiValue.textContent = parsed.mti ?? '—';
@@ -272,15 +211,6 @@ function showOutput(parsed, validation) {
   outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-<<<<<<< HEAD
-populateEncodingSelect();
-populateFieldSelect();
-updateFieldHelper();
-
-// ── Event listeners ───────────────────────────────────────────────────────────
-encodingSelect?.addEventListener('change', updateFieldHelper);
-fieldSelect?.addEventListener('change', updateFieldHelper);
-=======
 function updateProfileSummary(validation) {
   if (!profileBadge || !profileStatus) return;
 
@@ -392,7 +322,7 @@ function populatePresetSelect(select) {
   select.value = NETWORK_PRESETS[0].id;
 }
 
-function populateFieldSelect() {
+function populateBuilderFieldSelect() {
   const defs = Object.values(FIELD_DEFINITIONS)
     .filter(def => def.de !== 1)
     .sort((a, b) => a.de - b.de);
@@ -489,7 +419,7 @@ function refreshBuilderOutputs() {
   if (structuralErrors.length === 0 && mti.length === 4) {
     try {
       const payload = { mti, fields: cleanFields };
-      hex = buildHexFromJSON(payload);
+      hex = buildHexFromJSON(payload, { encoding: currentEncoding() });
       jsonText = JSON.stringify(payload, null, 2);
     } catch (err) {
       structuralErrors.push(err.message);
@@ -584,6 +514,13 @@ function renderHistory(list = loadHistory()) {
       meta.appendChild(skip);
     }
 
+    if (item.encoding && item.encoding !== DEFAULT_ENCODING) {
+      const enc = document.createElement('span');
+      enc.className = 'tag';
+      enc.textContent = encodingLabel(item.encoding);
+      meta.appendChild(enc);
+    }
+
     info.appendChild(meta);
 
     const actions = document.createElement('div');
@@ -600,9 +537,9 @@ function renderHistory(list = loadHistory()) {
   });
 }
 
-function addToHistory(parsed, hex, skipBytes) {
+function addToHistory(parsed, hex, skipBytes, encoding) {
   const history = loadHistory().filter(
-    (h) => !(h.hex === hex && (h.skipBytes || 0) === (skipBytes || 0))
+    (h) => !(h.hex === hex && (h.skipBytes || 0) === (skipBytes || 0) && normalizeEncoding(h.encoding) === normalizeEncoding(encoding))
   );
 
   history.unshift({
@@ -610,6 +547,7 @@ function addToHistory(parsed, hex, skipBytes) {
     mti: parsed.mti ?? '????',
     fieldCount: Object.keys(parsed.fields || {}).length,
     skipBytes: skipBytes || 0,
+    encoding: normalizeEncoding(encoding),
     timestamp: Date.now(),
   });
 
@@ -628,6 +566,11 @@ function clearHistory() {
 
 function hydrateFromSharedLink() {
   const params = new URLSearchParams(window.location.search);
+  if (params.has('encoding')) {
+    const enc = normalizeEncoding(params.get('encoding'));
+    if (encodingSelect) encodingSelect.value = enc;
+  }
+
   if (params.has('hex')) {
     const sharedHex = params.get('hex') || '';
     const sharedSkip = parseInt(params.get('skip'), 10) || 0;
@@ -643,7 +586,7 @@ function hydrateFromSharedLink() {
     try {
       const sharedJSON = params.get('json');
       const parsedJSON = JSON.parse(sharedJSON);
-      const hex = buildHexFromJSON(parsedJSON);
+      const hex = buildHexFromJSON(parsedJSON, { encoding: currentEncoding() });
       hexInput.value = hex;
       skipHeader.checked = false;
       btnParse.click();
@@ -656,16 +599,22 @@ function hydrateFromSharedLink() {
   return false;
 }
 
-function buildShareUrlFromHex(hex, skipBytes) {
+function buildShareUrlFromHex(hex, skipBytes, encoding) {
   const params = new URLSearchParams();
   params.set('hex', hex);
   if (skipBytes) params.set('skip', skipBytes);
+  if (encoding && normalizeEncoding(encoding) !== DEFAULT_ENCODING) {
+    params.set('encoding', normalizeEncoding(encoding));
+  }
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
-function buildShareUrlFromJSON(parsed) {
+function buildShareUrlFromJSON(parsed, encoding) {
   const params = new URLSearchParams();
   params.set('json', JSON.stringify(toMinimalJSON(parsed)));
+  if (encoding && normalizeEncoding(encoding) !== DEFAULT_ENCODING) {
+    params.set('encoding', normalizeEncoding(encoding));
+  }
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
@@ -686,9 +635,17 @@ function getSkipValue(checkbox, input) {
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
+populateEncodingSelect();
 populatePresetSelect(networkPresetSelect);
 populatePresetSelect(builderNetworkPreset);
->>>>>>> main
+populateHelperFieldSelect();
+populateBuilderFieldSelect();
+updateFieldHelper();
+if (helperFieldSelect) helperFieldSelect.addEventListener('change', updateFieldHelper);
+if (encodingSelect) encodingSelect.addEventListener('change', () => {
+  updateFieldHelper();
+  refreshBuilderOutputs();
+});
 
 btnParse.addEventListener('click', () => {
   const raw = hexInput.value.trim();
@@ -702,37 +659,23 @@ btnParse.addEventListener('click', () => {
 
   const options = {
     skipBytes: skipHeader.checked ? parseInt(skipBytes.value, 10) || 0 : 0,
+    encoding: currentEncoding(),
   };
   lastHexInput = raw;
   lastSkipBytes = options.skipBytes;
 
   // Use setTimeout to allow the UI to update before heavy work
-<<<<<<< HEAD
   setTimeout(() => {
     try {
-      const options = {
-        skipBytes: skipHeader.checked ? parseInt(skipBytes.value, 10) || 0 : 0,
-        encoding: currentEncoding(),
-      };
       const parsed = parseISO8583(raw, options);
-      showOutput(parsed);
+      const presetId = networkPresetSelect?.value || 'none';
+      const validation = validateMessageProfile(parsed, presetId);
+      showOutput(parsed, validation);
+      addToHistory(parsed, raw, options.skipBytes, options.encoding);
     } catch (err) {
       alert(`Fatal parse error: ${err.message}`);
     } finally {
       btnParse.disabled = false;
-=======
-    setTimeout(() => {
-      try {
-        const parsed = parseISO8583(raw, options);
-        const presetId = networkPresetSelect?.value || 'none';
-        const validation = validateMessageProfile(parsed, presetId);
-        showOutput(parsed, validation);
-        addToHistory(parsed, raw, options.skipBytes);
-      } catch (err) {
-        alert(`Fatal parse error: ${err.message}`);
-      } finally {
-        btnParse.disabled = false;
->>>>>>> main
       btnParse.textContent = 'Parse Message';
     }
   }, 10);
@@ -797,24 +740,22 @@ btnCopy.addEventListener('click', async () => {
     btnCopy.disabled = false;
   }, 2000);
 });
-<<<<<<< HEAD
-=======
 
-btnShareHex.addEventListener('click', async () => {
+btnShareHex?.addEventListener('click', async () => {
   if (!lastParsed) return;
-  const url = buildShareUrlFromHex(lastHexInput || hexInput.value.trim(), lastSkipBytes || 0);
+  const url = buildShareUrlFromHex(lastHexInput || hexInput.value.trim(), lastSkipBytes || 0, currentEncoding());
   const ok = await copyText(url);
   flashButton(btnShareHex, ok ? 'Copied link' : 'Copy failed', ok);
 });
 
-btnShareJson.addEventListener('click', async () => {
+btnShareJson?.addEventListener('click', async () => {
   if (!lastParsed) return;
-  const url = buildShareUrlFromJSON(lastParsed);
+  const url = buildShareUrlFromJSON(lastParsed, currentEncoding());
   const ok = await copyText(url);
   flashButton(btnShareJson, ok ? 'Copied link' : 'Copy failed', ok);
 });
 
-historyList.addEventListener('click', (e) => {
+historyList?.addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-index]');
   if (!btn) return;
   const index = parseInt(btn.dataset.index, 10);
@@ -826,10 +767,11 @@ historyList.addEventListener('click', (e) => {
   const skip = entry.skipBytes || 0;
   skipHeader.checked = skip > 0;
   skipBytes.value = skip;
+  if (entry.encoding && encodingSelect) encodingSelect.value = normalizeEncoding(entry.encoding);
   btnParse.click();
 });
 
-btnClearHistory.addEventListener('click', () => {
+btnClearHistory?.addEventListener('click', () => {
   clearHistory();
 });
 
@@ -849,8 +791,9 @@ if (btnCompare) {
 
     setTimeout(() => {
       try {
-        const parsedA = parseISO8583(hexA, { skipBytes: getSkipValue(compareSkipHeaderA, compareSkipBytesA) });
-        const parsedB = parseISO8583(hexB, { skipBytes: getSkipValue(compareSkipHeaderB, compareSkipBytesB) });
+        const encoding = currentEncoding();
+        const parsedA = parseISO8583(hexA, { skipBytes: getSkipValue(compareSkipHeaderA, compareSkipBytesA), encoding });
+        const parsedB = parseISO8583(hexB, { skipBytes: getSkipValue(compareSkipHeaderB, compareSkipBytesB), encoding });
         renderComparison(compareResult, parsedA, parsedB);
         clearCompareError();
       } catch (err) {
@@ -1001,10 +944,8 @@ builderSendToParser.addEventListener('click', () => {
   btnParse.click();
 });
 
-populateFieldSelect();
 builderFieldMeta.textContent = describeField(null);
 renderBuilderFields();
 refreshBuilderOutputs();
 renderHistory();
 hydrateFromSharedLink();
->>>>>>> main

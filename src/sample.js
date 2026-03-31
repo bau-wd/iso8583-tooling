@@ -1,15 +1,11 @@
+import { normalizeEncoding, textToHex } from './encoding.js';
+
 // Sample 0200 Authorization Request used by both the UI and CLI.
-// Hex is built from ASCII characters to mirror how real ISO 8583 payloads are encoded.
+// Hex is built using the chosen encoding (default ASCII) to mirror real payloads.
 
-function asciiToHex(text) {
-  return Array.from(text)
-    .map(c => c.charCodeAt(0).toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase();
-}
-
-function buildSampleHex() {
-  const enc = (s) => asciiToHex(s);
+function buildSampleHex(selectedEncoding = 'ascii') {
+  const encoding = normalizeEncoding(selectedEncoding);
+  const enc = (s) => textToHex(s, encoding);
 
   const mti    = enc('0200');
   const bitmap = '7238000102C08000';
