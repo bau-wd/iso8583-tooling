@@ -6,10 +6,13 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 
 ## Features
 
+- 🛠 **Message Builder** — compose MTI + data elements visually and auto-generate hex/JSON
 - 🔍 **Parse** hex-encoded ISO 8583:1993 messages in the browser
 - 🗂 **Visualize** all data elements (DE1–DE128) in a structured, color-coded table
 - 🗺 **Bitmap decoding** — primary and secondary bitmaps parsed automatically
 - 📤 **Export to JSON** — download the parsed message as a `.json` file
+- 🧭 **Message history** — recent parses are stored locally and can be reloaded with one click
+- 🔗 **Shareable links** — share hex or JSON payloads via URL for easy collaboration
 - ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
 - 📦 **Zero backend** — runs entirely in the browser
 - 🎨 **Color-coded fields** by category (card data, auth data, private data)
@@ -45,15 +48,18 @@ npm run preview
 
 ## How to Use
 
-1. **Paste** your hex-encoded ISO 8583 message into the textarea.  
-   *(Or click **Load Sample** to use the built-in demo message.)*
-2. *(Optional)* Check **Skip length header** and enter the number of bytes to skip at the start (e.g. `2` for a 2-byte TPDU header).
-3. Click **Parse Message**.
-4. The tool displays:
+1. *(Optional)* Use the **Message Builder**: choose MTI, add data elements, and click **Load Into Parser** to populate the parser input.
+2. Or **Paste** your hex-encoded ISO 8583 message into the textarea.  
+   *(Click **Load Sample** to use the built-in demo message.)*
+3. *(Optional)* Check **Skip length header** and enter the number of bytes to skip at the start (e.g. `2` for a 2-byte TPDU header).
+4. Click **Parse Message**.
+5. The tool displays:
    - MTI badge
    - Primary (and secondary) bitmap hex values
    - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
-5. Click **Export JSON** to download the parsed result as a `.json` file.
+6. Click **Export JSON** to download the parsed result as a `.json` file.
+7. Use **Copy Hex Link** or **Copy JSON Link** to generate a shareable URL that preloads the message.
+8. Recent messages appear in **History**; click **Load** to repopulate the input instantly.
 
 ---
 

@@ -67,6 +67,10 @@ const btnExport     = document.getElementById('btnExport');
 const btnCopy       = document.getElementById('btnCopy');
 const btnImport     = document.getElementById('btnImport');
 const importFileInput = document.getElementById('importFileInput');
+const btnShareHex   = document.getElementById('btnShareHex');
+const btnShareJson  = document.getElementById('btnShareJson');
+const historyList   = document.getElementById('historyList');
+const btnClearHistory = document.getElementById('btnClearHistory');
 const outputSection = document.getElementById('outputSection');
 const mtiValue      = document.getElementById('mtiValue');
 const primaryBitmapValue   = document.getElementById('primaryBitmapValue');
@@ -94,11 +98,16 @@ const builderCopyJson          = document.getElementById('builderCopyJson');
 const builderDownloadJson      = document.getElementById('builderDownloadJson');
 const builderSendToParser      = document.getElementById('builderSendToParser');
 
+const HISTORY_KEY   = 'iso8583-history';
+const HISTORY_LIMIT = 10;
+
 const builderState = { fields: {} };
 
 let lastParsed = null;
+let lastHexInput = '';
+let lastSkipBytes = 0;
 
-// ── Helpers ───���───────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 function showOutput(parsed) {
   lastParsed = parsed;
 
@@ -120,6 +129,44 @@ function showOutput(parsed) {
   outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function toMinimalJSON(parsed) {
+  return {
+    mti: parsed.mti,
+    fields: Object.fromEntries(
+      Object.entries(parsed.fields).map(([k, f]) => [k, f.value])
+    ),
+  };
+}
+
+async function copyText(value, button) {
+  if (!value) return false;
+  try {
+    await navigator.clipboard.writeText(value);
+    if (button) {
+      const prev = button.textContent;
+      button.textContent = '✓ Copied';
+      button.disabled = true;
+      setTimeout(() => {
+        button.textContent = prev;
+        button.disabled = false;
+      }, 1500);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function flashButton(btn, message, success = true) {
+  const original = btn.textContent;
+  btn.textContent = success ? `✓ ${message}` : `✗ ${message}`;
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.disabled = false;
+  }, 2000);
+}
+
 // ── Builder helpers ──────────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str)
@@ -131,11 +178,11 @@ function escapeHtml(str) {
 
 function populateFieldSelect() {
   const defs = Object.values(FIELD_DEFINITIONS)
-    .filter(def => def.de !== 1) // DE1 is bitmap indicator
+    .filter(def => def.de !== 1)
     .sort((a, b) => a.de - b.de);
 
-  builderFieldSelect.innerHTML = '<option value=\"\" disabled selected>Select data element…</option>' +
-    defs.map(def => `<option value=\"${def.de}\">DE${def.de.toString().padStart(3, '0')} — ${escapeHtml(def.name)}</option>`).join('');
+  builderFieldSelect.innerHTML = '<option value="" disabled selected>Select data element…</option>' +
+    defs.map(def => `<option value="${def.de}">DE${def.de.toString().padStart(3, '0')} — ${escapeHtml(def.name)}</option>`).join('');
 }
 
 function describeField(def) {
@@ -149,7 +196,7 @@ function describeField(def) {
 function renderBuilderFields() {
   const rows = Object.keys(builderState.fields).map(Number).sort((a, b) => a - b);
   if (rows.length === 0) {
-    builderFieldTableBody.innerHTML = '<tr><td class=\"empty\" colspan=\"5\">No data elements added yet.</td></tr>';
+    builderFieldTableBody.innerHTML = '<tr><td class="empty" colspan="5">No data elements added yet.</td></tr>';
     builderFieldCount.textContent = '0 fields';
     builderPrimaryBitmap.textContent = '0000000000000000';
     builderSecondaryBitmap.textContent = '—';
@@ -166,19 +213,19 @@ function renderBuilderFields() {
       : 'unknown';
     return `
       <tr>
-        <td><span class=\"de-badge\">${escapeHtml(de)}</span></td>
+        <td><span class="de-badge">${escapeHtml(de)}</span></td>
         <td>${escapeHtml(def?.name ?? 'Unknown')}</td>
         <td><code>${escapeHtml(def?.format ?? '?')}</code> · ${escapeHtml(lengthHint)}</td>
         <td>
           <input
-            class=\"builder-value\"
-            data-de=\"${de}\"
-            value=\"${escapeHtml(builderState.fields[de])}\"
-            spellcheck=\"false\"
+            class="builder-value"
+            data-de="${de}"
+            value="${escapeHtml(builderState.fields[de])}"
+            spellcheck="false"
             />
         </td>
         <td>
-          <button class=\"btn btn-secondary btn-xs\" data-action=\"remove\" data-de=\"${de}\">Remove</button>
+          <button class="btn btn-secondary btn-xs" data-action="remove" data-de="${de}">Remove</button>
         </td>
       </tr>
     `;
@@ -247,23 +294,151 @@ function refreshBuilderOutputs() {
   return { hex, jsonText };
 }
 
-async function copyText(value, button) {
-  if (!value) return false;
+// ── History helpers ───────────────────────────────────────────────────────
+function loadHistory() {
   try {
-    await navigator.clipboard.writeText(value);
-    if (button) {
-      const prev = button.textContent;
-      button.textContent = '✓ Copied';
-      button.disabled = true;
-      setTimeout(() => {
-        button.textContent = prev;
-        button.disabled = false;
-      }, 1500);
-    }
-    return true;
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return false;
+    return [];
   }
+}
+
+function persistHistory(list) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
+  } catch {
+    // ignore write failures (e.g., storage disabled)
+  }
+}
+
+function renderHistory(list = loadHistory()) {
+  if (!historyList) return;
+  historyList.innerHTML = '';
+
+  if (!list.length) {
+    const empty = document.createElement('li');
+    empty.className = 'history-empty';
+    empty.textContent = 'No messages yet. Parse or import one to start a history.';
+    historyList.appendChild(empty);
+    return;
+  }
+
+  list.slice(0, HISTORY_LIMIT).forEach((item, idx) => {
+    const li = document.createElement('li');
+    li.className = 'history-item';
+
+    const info = document.createElement('div');
+    info.className = 'history-info';
+
+    const title = document.createElement('div');
+    title.className = 'history-title';
+    title.textContent = item.mti || '????';
+    info.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'history-meta';
+
+    const fieldBadge = document.createElement('span');
+    fieldBadge.textContent = `${item.fieldCount} field${item.fieldCount === 1 ? '' : 's'}`;
+    meta.appendChild(fieldBadge);
+
+    const timestamp = document.createElement('span');
+    timestamp.textContent = new Date(item.timestamp).toLocaleString();
+    meta.appendChild(timestamp);
+
+    if (item.skipBytes) {
+      const skip = document.createElement('span');
+      skip.className = 'tag';
+      skip.textContent = `Skip ${item.skipBytes} byte${item.skipBytes === 1 ? '' : 's'}`;
+      meta.appendChild(skip);
+    }
+
+    info.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'history-actions';
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'btn btn-secondary btn-sm';
+    loadBtn.dataset.index = String(idx);
+    loadBtn.textContent = 'Load';
+    actions.appendChild(loadBtn);
+
+    li.appendChild(info);
+    li.appendChild(actions);
+    historyList.appendChild(li);
+  });
+}
+
+function addToHistory(parsed, hex, skipBytes) {
+  const history = loadHistory().filter(
+    (h) => !(h.hex === hex && (h.skipBytes || 0) === (skipBytes || 0))
+  );
+
+  history.unshift({
+    hex,
+    mti: parsed.mti ?? '????',
+    fieldCount: Object.keys(parsed.fields || {}).length,
+    skipBytes: skipBytes || 0,
+    timestamp: Date.now(),
+  });
+
+  persistHistory(history);
+  renderHistory(history);
+}
+
+function clearHistory() {
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // ignore
+  }
+  renderHistory([]);
+}
+
+function hydrateFromSharedLink() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('hex')) {
+    const sharedHex = params.get('hex') || '';
+    const sharedSkip = parseInt(params.get('skip'), 10) || 0;
+    hexInput.value = sharedHex;
+    skipHeader.checked = sharedSkip > 0;
+    skipBytes.value = sharedSkip || 0;
+    btnParse.click();
+    history.replaceState(null, '', window.location.pathname);
+    return true;
+  }
+
+  if (params.has('json')) {
+    try {
+      const sharedJSON = params.get('json');
+      const parsedJSON = JSON.parse(sharedJSON);
+      const hex = buildHexFromJSON(parsedJSON);
+      hexInput.value = hex;
+      skipHeader.checked = false;
+      btnParse.click();
+      history.replaceState(null, '', window.location.pathname);
+      return true;
+    } catch (err) {
+      alert(`Shared JSON link is invalid: ${err.message}`);
+    }
+  }
+  return false;
+}
+
+function buildShareUrlFromHex(hex, skipBytes) {
+  const params = new URLSearchParams();
+  params.set('hex', hex);
+  if (skipBytes) params.set('skip', skipBytes);
+  return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+}
+
+function buildShareUrlFromJSON(parsed) {
+  const params = new URLSearchParams();
+  params.set('json', JSON.stringify(toMinimalJSON(parsed)));
+  return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
@@ -277,14 +452,18 @@ btnParse.addEventListener('click', () => {
   btnParse.disabled = true;
   btnParse.textContent = 'Parsing…';
 
+  const options = {
+    skipBytes: skipHeader.checked ? parseInt(skipBytes.value, 10) || 0 : 0,
+  };
+  lastHexInput = raw;
+  lastSkipBytes = options.skipBytes;
+
   // Use setTimeout to allow the UI to update before heavy work
   setTimeout(() => {
     try {
-      const options = {
-        skipBytes: skipHeader.checked ? parseInt(skipBytes.value, 10) || 0 : 0,
-      };
       const parsed = parseISO8583(raw, options);
       showOutput(parsed);
+      addToHistory(parsed, raw, options.skipBytes);
     } catch (err) {
       alert(`Fatal parse error: ${err.message}`);
     } finally {
@@ -344,6 +523,39 @@ btnCopy.addEventListener('click', async () => {
     btnCopy.textContent = original;
     btnCopy.disabled = false;
   }, 2000);
+});
+
+btnShareHex.addEventListener('click', async () => {
+  if (!lastParsed) return;
+  const url = buildShareUrlFromHex(lastHexInput || hexInput.value.trim(), lastSkipBytes || 0);
+  const ok = await copyText(url);
+  flashButton(btnShareHex, ok ? 'Copied link' : 'Copy failed', ok);
+});
+
+btnShareJson.addEventListener('click', async () => {
+  if (!lastParsed) return;
+  const url = buildShareUrlFromJSON(lastParsed);
+  const ok = await copyText(url);
+  flashButton(btnShareJson, ok ? 'Copied link' : 'Copy failed', ok);
+});
+
+historyList.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-index]');
+  if (!btn) return;
+  const index = parseInt(btn.dataset.index, 10);
+  const history = loadHistory();
+  const entry = history[index];
+  if (!entry) return;
+
+  hexInput.value = entry.hex;
+  const skip = entry.skipBytes || 0;
+  skipHeader.checked = skip > 0;
+  skipBytes.value = skip;
+  btnParse.click();
+});
+
+btnClearHistory.addEventListener('click', () => {
+  clearHistory();
 });
 
 // ── Builder events ───────────────────────────────────────────────────────────
@@ -439,3 +651,5 @@ populateFieldSelect();
 builderFieldMeta.textContent = describeField(null);
 renderBuilderFields();
 refreshBuilderOutputs();
+renderHistory();
+hydrateFromSharedLink();
