@@ -97,13 +97,6 @@ const builderCopyHex           = document.getElementById('builderCopyHex');
 const builderCopyJson          = document.getElementById('builderCopyJson');
 const builderDownloadJson      = document.getElementById('builderDownloadJson');
 const builderSendToParser      = document.getElementById('builderSendToParser');
-<<<<<<< HEAD
-=======
-
-const builderState = { fields: {} };
-
-let lastParsed = null;
->>>>>>> main
 
 const HISTORY_KEY   = 'iso8583-history';
 const HISTORY_LIMIT = 10;
@@ -136,7 +129,6 @@ function showOutput(parsed) {
   outputSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-<<<<<<< HEAD
 function toMinimalJSON(parsed) {
   return {
     mti: parsed.mti,
@@ -175,8 +167,6 @@ function flashButton(btn, message, success = true) {
   }, 2000);
 }
 
-=======
->>>>>>> main
 // ── Builder helpers ──────────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str)
@@ -188,19 +178,11 @@ function escapeHtml(str) {
 
 function populateFieldSelect() {
   const defs = Object.values(FIELD_DEFINITIONS)
-<<<<<<< HEAD
     .filter(def => def.de !== 1)
     .sort((a, b) => a.de - b.de);
 
   builderFieldSelect.innerHTML = '<option value="" disabled selected>Select data element…</option>' +
     defs.map(def => `<option value="${def.de}">DE${def.de.toString().padStart(3, '0')} — ${escapeHtml(def.name)}</option>`).join('');
-=======
-    .filter(def => def.de !== 1) // DE1 is bitmap indicator
-    .sort((a, b) => a.de - b.de);
-
-  builderFieldSelect.innerHTML = '<option value=\"\" disabled selected>Select data element…</option>' +
-    defs.map(def => `<option value=\"${def.de}\">DE${def.de.toString().padStart(3, '0')} — ${escapeHtml(def.name)}</option>`).join('');
->>>>>>> main
 }
 
 function describeField(def) {
@@ -214,11 +196,7 @@ function describeField(def) {
 function renderBuilderFields() {
   const rows = Object.keys(builderState.fields).map(Number).sort((a, b) => a - b);
   if (rows.length === 0) {
-<<<<<<< HEAD
     builderFieldTableBody.innerHTML = '<tr><td class="empty" colspan="5">No data elements added yet.</td></tr>';
-=======
-    builderFieldTableBody.innerHTML = '<tr><td class=\"empty\" colspan=\"5\">No data elements added yet.</td></tr>';
->>>>>>> main
     builderFieldCount.textContent = '0 fields';
     builderPrimaryBitmap.textContent = '0000000000000000';
     builderSecondaryBitmap.textContent = '—';
@@ -235,16 +213,11 @@ function renderBuilderFields() {
       : 'unknown';
     return `
       <tr>
-<<<<<<< HEAD
         <td><span class="de-badge">${escapeHtml(de)}</span></td>
-=======
-        <td><span class=\"de-badge\">${escapeHtml(de)}</span></td>
->>>>>>> main
         <td>${escapeHtml(def?.name ?? 'Unknown')}</td>
         <td><code>${escapeHtml(def?.format ?? '?')}</code> · ${escapeHtml(lengthHint)}</td>
         <td>
           <input
-<<<<<<< HEAD
             class="builder-value"
             data-de="${de}"
             value="${escapeHtml(builderState.fields[de])}"
@@ -253,16 +226,6 @@ function renderBuilderFields() {
         </td>
         <td>
           <button class="btn btn-secondary btn-xs" data-action="remove" data-de="${de}">Remove</button>
-=======
-            class=\"builder-value\"
-            data-de=\"${de}\"
-            value=\"${escapeHtml(builderState.fields[de])}\"
-            spellcheck=\"false\"
-            />
-        </td>
-        <td>
-          <button class=\"btn btn-secondary btn-xs\" data-action=\"remove\" data-de=\"${de}\">Remove</button>
->>>>>>> main
         </td>
       </tr>
     `;
@@ -331,7 +294,6 @@ function refreshBuilderOutputs() {
   return { hex, jsonText };
 }
 
-<<<<<<< HEAD
 // ── History helpers ───────────────────────────────────────────────────────
 function loadHistory() {
   try {
@@ -477,25 +439,6 @@ function buildShareUrlFromJSON(parsed) {
   const params = new URLSearchParams();
   params.set('json', JSON.stringify(toMinimalJSON(parsed)));
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
-=======
-async function copyText(value, button) {
-  if (!value) return false;
-  try {
-    await navigator.clipboard.writeText(value);
-    if (button) {
-      const prev = button.textContent;
-      button.textContent = '✓ Copied';
-      button.disabled = true;
-      setTimeout(() => {
-        button.textContent = prev;
-        button.disabled = false;
-      }, 1500);
-    }
-    return true;
-  } catch {
-    return false;
-  }
->>>>>>> main
 }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
@@ -582,7 +525,6 @@ btnCopy.addEventListener('click', async () => {
   }, 2000);
 });
 
-<<<<<<< HEAD
 btnShareHex.addEventListener('click', async () => {
   if (!lastParsed) return;
   const url = buildShareUrlFromHex(lastHexInput || hexInput.value.trim(), lastSkipBytes || 0);
@@ -616,8 +558,6 @@ btnClearHistory.addEventListener('click', () => {
   clearHistory();
 });
 
-=======
->>>>>>> main
 // ── Builder events ───────────────────────────────────────────────────────────
 builderFieldSelect.addEventListener('change', () => {
   const def = FIELD_DEFINITIONS[Number(builderFieldSelect.value)];
@@ -711,8 +651,5 @@ populateFieldSelect();
 builderFieldMeta.textContent = describeField(null);
 renderBuilderFields();
 refreshBuilderOutputs();
-<<<<<<< HEAD
 renderHistory();
 hydrateFromSharedLink();
-=======
->>>>>>> main
