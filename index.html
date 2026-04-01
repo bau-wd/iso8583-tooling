@@ -65,6 +65,19 @@
             <button id="smartClear" class="btn btn-secondary">Clear</button>
             <button id="smartUseBaseline" class="btn btn-secondary">Set Baseline</button>
           </div>
+
+          <div class="output-actions">
+            <button id="smartCopyHex" class="btn btn-secondary">Copy hex</button>
+            <button id="smartCopyJson" class="btn btn-secondary">Copy JSON</button>
+            <button id="smartDownloadJson" class="btn btn-secondary">Download JSON</button>
+            <label class="btn btn-secondary" for="smartImportJson">Import JSON</label>
+            <input id="smartImportJson" type="file" accept="application/json" hidden />
+            <button id="smartShareLink" class="btn btn-secondary">Copy share link</button>
+          </div>
+          <p class="helper-text small">
+            Export/import uses the minimal JSON shape. Share links include the current hex, encoding, and skip-header
+            setting.
+          </p>
         </div>
 
         <div class="smart-summary-grid">
@@ -130,14 +143,18 @@
           ></textarea>
           <div id="smartDiffResult" class="smart-diff-result"></div>
         </div>
-      </section>
 
-      <section class="card info-section">
-        <h2>All-in-one workspace</h2>
-        <p class="helper-text">
-          The legacy Builder, Parser, and Diff screens have been consolidated into the Smart ISO 8583 Editor above.
-          Use the single view to paste raw hex, edit fields inline, rebuild messages, and toggle diff mode without leaving the page.
-        </p>
+        <div class="history-section">
+          <div class="history-header">
+            <div>
+              <h3>History</h3>
+              <p class="helper-text small">Recent messages are kept locally in your browser.</p>
+            </div>
+            <button id="smartClearHistory" class="btn btn-secondary btn-sm">Clear history</button>
+          </div>
+          <ul id="smartHistoryList" class="history-list"></ul>
+          <p id="smartHistoryEmpty" class="history-empty">No history yet. Parse or build a message to store it.</p>
+        </div>
       </section>
     </main>
 

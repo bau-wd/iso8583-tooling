@@ -1,11 +1,14 @@
 import { parseISO8583 } from './parser.js';
 import { renderComparison } from './renderer.js';
-import { buildHexFromJSON } from './importer.js';
+import { buildHexFromJSON, readJSONFile } from './importer.js';
+import { copyJSONToClipboard, downloadJSON } from './exporter.js';
 import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
 import { buildSampleHex } from './sample.js';
 import { ENCODING_OPTIONS, normalizeEncoding } from './encoding.js';
 
 const DEFAULT_ENCODING = 'ascii';
+const HISTORY_KEY = 'iso8583-history';
+const HISTORY_LIMIT = 15;
 
 function debounce(fn, delay = 200) {
   let timer;
@@ -60,6 +63,31 @@ function badge(text) {
   return text && text.length ? text : '—';
 }
 
+function flash(labelEl, text = 'Copied!') {
+  if (!labelEl) return;
+  const original = labelEl.textContent;
+  labelEl.textContent = text;
+  setTimeout(() => {
+    labelEl.textContent = original;
+  }, 1100);
+}
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(entries) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export function initSmartEditor() {
   const root = document.getElementById('smartEditor');
   if (!root) return;
@@ -88,6 +116,14 @@ export function initSmartEditor() {
   const useCurrentBaseline = root.querySelector('#smartUseCurrentBaseline');
   const diffPanel          = root.querySelector('#smartDiffPanel');
   const diffResult         = root.querySelector('#smartDiffResult');
+  const copyHexBtn         = root.querySelector('#smartCopyHex');
+  const copyJsonBtn        = root.querySelector('#smartCopyJson');
+  const downloadJsonBtn    = root.querySelector('#smartDownloadJson');
+  const importJsonInput    = root.querySelector('#smartImportJson');
+  const shareLinkBtn       = root.querySelector('#smartShareLink');
+  const historyList        = root.querySelector('#smartHistoryList');
+  const historyEmpty       = root.querySelector('#smartHistoryEmpty');
+  const clearHistoryBtn    = root.querySelector('#smartClearHistory');
 
   const state = {
     encoding: DEFAULT_ENCODING,
@@ -98,6 +134,7 @@ export function initSmartEditor() {
     baselineParsed: null,
     fields: {},
     mti: '0200',
+    history: loadHistory(),
   };
   const scheduleRebuild = debounce((options = {}) => rebuildFromState(options), 120);
 
@@ -127,6 +164,67 @@ export function initSmartEditor() {
       const count = Object.keys(state.fields || {}).length;
       summaryFieldCount.textContent = `${count} field${count === 1 ? '' : 's'}`;
     }
+  }
+
+  function shareableUrl(hex, encoding, skipBytes) {
+    const params = new URLSearchParams();
+    params.set('hex', hex);
+    params.set('enc', encoding || DEFAULT_ENCODING);
+    if (skipBytes) params.set('skip', skipBytes);
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  }
+
+  function renderHistoryList() {
+    if (!historyList) return;
+    historyList.innerHTML = '';
+    if (!state.history.length) {
+      historyEmpty?.classList.remove('hidden');
+      return;
+    }
+    historyEmpty?.classList.add('hidden');
+
+    state.history.forEach((entry) => {
+      const li = document.createElement('li');
+      li.className = 'history-item';
+      li.dataset.id = entry.id;
+      const preview = entry.hex.length > 24 ? `${entry.hex.slice(0, 24)}…` : entry.hex;
+      li.innerHTML = `
+        <div class="history-info">
+          <div class="history-title">${escapeHtml(entry.mti || '????')} · ${escapeHtml(preview)}</div>
+          <div class="history-meta">
+            <span class="tag">Fields: ${entry.fieldCount}</span>
+            <span class="tag">Length: ${Math.ceil(entry.hex.length / 2)} bytes</span>
+            <span class="tag">Encoding: ${escapeHtml(entry.encoding)}</span>
+            ${entry.skipBytes ? `<span class="tag">Skip ${entry.skipBytes} bytes</span>` : ''}
+          </div>
+        </div>
+        <div class="history-actions">
+          <button class="btn btn-primary btn-sm" data-action="load">Load</button>
+          <button class="btn btn-secondary btn-sm" data-action="link">Copy link</button>
+        </div>
+      `;
+      historyList.appendChild(li);
+    });
+  }
+
+  function addHistoryEntry(parsed, hex) {
+    const cleaned = cleanHex(hex);
+    if (!cleaned) return;
+    const entry = {
+      id: Date.now(),
+      hex: cleaned,
+      mti: parsed?.mti || state.mti || '0200',
+      fieldCount: Object.keys(parsed?.fields || {}).length,
+      encoding: state.encoding || DEFAULT_ENCODING,
+      skipBytes: currentSkipBytes(),
+    };
+    state.history = state.history.filter(
+      h => !(h.hex === entry.hex && h.encoding === entry.encoding && h.skipBytes === entry.skipBytes)
+    );
+    state.history.unshift(entry);
+    state.history = state.history.slice(0, HISTORY_LIMIT);
+    saveHistory(state.history);
+    renderHistoryList();
   }
 
   function renderInspector(parsed) {
@@ -180,6 +278,7 @@ export function initSmartEditor() {
 
   function parseHex(inputHex, opts = {}) {
     const hex = cleanHex(inputHex);
+    const recordHistory = Boolean(opts.recordHistory);
     if (!hex) {
       state.currentParsed = null;
       state.fields = {};
@@ -194,6 +293,8 @@ export function initSmartEditor() {
       skipBytes: opts.skipBytes ?? currentSkipBytes(),
       encoding: normalizeEncoding(opts.encoding || state.encoding),
     };
+    state.encoding = options.encoding;
+    state.skipBytes = options.skipBytes;
 
     const parsed = parseISO8583(hex, options);
     state.currentHex = hex;
@@ -204,6 +305,16 @@ export function initSmartEditor() {
     renderInspector(parsed);
     refreshSummary(parsed);
     showError('');
+    if (recordHistory) addHistoryEntry(parsed, hex);
+    return parsed;
+  }
+
+  function ensureParsedForAction() {
+    const parsed = state.currentParsed || parseHex(rawInput.value, { recordHistory: false });
+    if (!parsed) {
+      showError('Parse a message first.');
+      return null;
+    }
     return parsed;
   }
 
@@ -224,7 +335,7 @@ export function initSmartEditor() {
       state.skipBytes = 0;
       if (skipHeader) skipHeader.checked = false;
       if (skipBytesInput) skipBytesInput.value = 0;
-      const parsed = parseHex(hex, { skipBytes: 0, encoding });
+      const parsed = parseHex(hex, { skipBytes: 0, encoding, recordHistory: true });
       if (parsed && diffToggle?.checked && !skipDiff) renderDiff();
     } catch (err) {
       showError(err.message);
@@ -263,7 +374,7 @@ export function initSmartEditor() {
 
   const debouncedParse = debounce(() => {
     try {
-      const parsed = parseHex(rawInput.value);
+      const parsed = parseHex(rawInput.value, { recordHistory: false });
       if (parsed && diffToggle?.checked) renderDiff();
     } catch (err) {
       showError(err.message);
@@ -274,7 +385,7 @@ export function initSmartEditor() {
   rawInput?.addEventListener('input', debouncedParse);
   parseButton?.addEventListener('click', () => {
     try {
-      const parsed = parseHex(rawInput.value);
+      const parsed = parseHex(rawInput.value, { recordHistory: true });
       if (parsed && diffToggle?.checked) renderDiff();
     } catch (err) {
       showError(err.message);
@@ -285,7 +396,7 @@ export function initSmartEditor() {
     const encoding = normalizeEncoding(encodingSelect?.value || DEFAULT_ENCODING);
     const sample = buildSampleHex(encoding);
     rawInput.value = sample;
-    parseHex(sample, { skipBytes: 0, encoding });
+    parseHex(sample, { skipBytes: 0, encoding, recordHistory: true });
     renderDiff();
   });
 
@@ -328,7 +439,7 @@ export function initSmartEditor() {
   encodingSelect?.addEventListener('change', () => {
     state.encoding = normalizeEncoding(encodingSelect.value);
     if (rawInput.value.trim()) {
-      parseHex(rawInput.value, { encoding: state.encoding });
+      parseHex(rawInput.value, { encoding: state.encoding, recordHistory: true });
       renderDiff();
     }
   });
@@ -406,7 +517,133 @@ export function initSmartEditor() {
     parseBaselineBtn?.click();
   });
 
+  copyHexBtn?.addEventListener('click', async () => {
+    const hex = cleanHex(rawInput.value);
+    if (!hex) {
+      showError('No hex to copy. Parse or build a message first.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(hex);
+      flash(copyHexBtn);
+      showError('');
+    } catch {
+      showError('Copy to clipboard failed.');
+    }
+  });
+
+  copyJsonBtn?.addEventListener('click', async () => {
+    const parsed = ensureParsedForAction();
+    if (!parsed) return;
+    const ok = await copyJSONToClipboard(parsed);
+    if (ok) {
+      flash(copyJsonBtn);
+      showError('');
+    } else {
+      showError('Unable to copy JSON to clipboard.');
+    }
+  });
+
+  downloadJsonBtn?.addEventListener('click', () => {
+    const parsed = ensureParsedForAction();
+    if (!parsed) return;
+    downloadJSON(parsed, 'iso8583-message.json');
+    showError('');
+  });
+
+  importJsonInput?.addEventListener('change', async (e) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    try {
+      const payload = await readJSONFile(file);
+      const hex = buildHexFromJSON(payload, { encoding: state.encoding });
+      rawInput.value = hex;
+      parseHex(hex, { skipBytes: 0, encoding: state.encoding, recordHistory: true });
+      renderDiff();
+      showError('');
+    } catch (err) {
+      showError(`Import failed: ${err.message}`);
+    } finally {
+      e.target.value = '';
+    }
+  });
+
+  shareLinkBtn?.addEventListener('click', async () => {
+    const hex = cleanHex(rawInput.value);
+    if (!hex) {
+      showError('Parse or build a message before sharing.');
+      return;
+    }
+    const url = shareableUrl(hex, state.encoding, currentSkipBytes());
+    try {
+      await navigator.clipboard.writeText(url);
+      flash(shareLinkBtn, 'Link copied');
+      showError('');
+    } catch {
+      showError('Copy link failed.');
+    }
+  });
+
+  historyList?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const li = btn.closest('li.history-item');
+    if (!li) return;
+    const entry = state.history.find(h => String(h.id) === li.dataset.id);
+    if (!entry) return;
+
+    if (btn.dataset.action === 'load') {
+      if (encodingSelect) encodingSelect.value = entry.encoding;
+      state.encoding = normalizeEncoding(entry.encoding);
+      rawInput.value = entry.hex;
+      if (skipHeader) skipHeader.checked = entry.skipBytes > 0;
+      if (skipBytesInput) skipBytesInput.value = entry.skipBytes || 0;
+      parseHex(entry.hex, {
+        skipBytes: entry.skipBytes || 0,
+        encoding: state.encoding,
+        recordHistory: true,
+      });
+      renderDiff();
+      return;
+    }
+
+    if (btn.dataset.action === 'link') {
+      const link = shareableUrl(entry.hex, entry.encoding, entry.skipBytes);
+      try {
+        await navigator.clipboard.writeText(link);
+        flash(btn, 'Copied');
+      } catch {
+        showError('Copy link failed.');
+      }
+    }
+  });
+
+  clearHistoryBtn?.addEventListener('click', () => {
+    state.history = [];
+    saveHistory(state.history);
+    renderHistoryList();
+  });
+
+  function hydrateFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const hex = cleanHex(params.get('hex') || '');
+    if (!hex) {
+      renderHistoryList();
+      return;
+    }
+    const encoding = normalizeEncoding(params.get('enc') || DEFAULT_ENCODING);
+    const skip = parseInt(params.get('skip'), 10);
+    if (encodingSelect) encodingSelect.value = encoding;
+    if (skipHeader) skipHeader.checked = Number.isFinite(skip) && skip > 0;
+    if (skipBytesInput) skipBytesInput.value = Number.isFinite(skip) ? skip : 0;
+    state.encoding = encoding;
+    rawInput.value = hex;
+    parseHex(hex, { skipBytes: Number.isFinite(skip) ? skip : 0, encoding, recordHistory: true });
+  }
+
   // Initial empty state render
+  renderHistoryList();
+  hydrateFromQuery();
   renderInspector(null);
   refreshSummary(null);
 }
