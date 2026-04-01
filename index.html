@@ -15,6 +15,123 @@
     </header>
 
     <main>
+      <!-- Smart Editor -->
+      <section class="card smart-editor" id="smartEditor">
+        <div class="smart-header">
+          <div>
+            <h2>Smart ISO 8583 Editor</h2>
+            <p class="helper-text">Parse, inspect, edit, and diff without switching screens.</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="smartDiffToggle" />
+            <span>Diff mode</span>
+          </label>
+        </div>
+
+        <div class="smart-raw">
+          <label for="smartRawInput">Raw ISO 8583 message (hex)</label>
+          <textarea
+            id="smartRawInput"
+            rows="3"
+            placeholder="Paste or type a hex-encoded ISO 8583 message…"
+            spellcheck="false"
+          ></textarea>
+
+          <div class="smart-raw-controls">
+            <label class="checkbox-label">
+              <input type="checkbox" id="smartSkipHeader" />
+              Skip length header (first
+              <input
+                type="number"
+                id="smartSkipBytes"
+                value="2"
+                min="0"
+                max="8"
+                style="width: 3.5rem"
+              />
+              bytes)
+            </label>
+
+            <label class="select-label">
+              <span>Text Encoding</span>
+              <select id="smartEncoding"></select>
+              <span class="hint-text">Decodes MTI, length prefixes, and text fields.</span>
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button id="smartParse" class="btn btn-primary">Parse</button>
+            <button id="smartSample" class="btn btn-secondary">Load Sample</button>
+            <button id="smartClear" class="btn btn-secondary">Clear</button>
+            <button id="smartUseBaseline" class="btn btn-secondary">Set Baseline</button>
+          </div>
+        </div>
+
+        <div class="smart-summary-grid">
+          <div class="smart-summary-block">
+            <label for="smartMti">Message Type Indicator (MTI)</label>
+            <input id="smartMti" class="text-input" type="text" maxlength="4" value="0200" spellcheck="false" />
+            <p class="helper-text small">Editing recalculates bitmaps and raw hex automatically.</p>
+          </div>
+          <div class="smart-summary-stats">
+            <div class="stat-pill">
+              <span class="label">Primary Bitmap</span>
+              <code id="smartSummaryBitmap" class="mono"></code>
+            </div>
+            <div class="stat-pill">
+              <span class="label">Secondary Bitmap</span>
+              <code id="smartSummaryBitmap2" class="mono"></code>
+            </div>
+            <div class="stat-pill">
+              <span class="label">Fields</span>
+              <span id="smartSummaryFieldCount" class="badge badge-count">0 fields</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="smartError" class="error-banner hidden"></div>
+
+        <div class="smart-add-row">
+          <div class="smart-add-controls">
+            <label for="smartFieldSelect">Add / update data element</label>
+            <div class="smart-add-inline">
+              <select id="smartFieldSelect" class="text-input"></select>
+              <input
+                id="smartFieldValue"
+                class="text-input"
+                type="text"
+                placeholder="Value"
+                spellcheck="false"
+              />
+              <button id="smartAddField" class="btn btn-primary btn-sm">Add field</button>
+            </div>
+            <p class="helper-text small">Inline edits below update the raw message instantly.</p>
+          </div>
+        </div>
+
+        <div id="smartInspector" class="smart-inspector"></div>
+
+        <div id="smartDiffPanel" class="smart-diff hidden">
+          <div class="smart-diff-header">
+            <div>
+              <h3>Baseline message</h3>
+              <p class="helper-text small">Provide a baseline to diff against the current message.</p>
+            </div>
+            <div class="button-row">
+              <button id="smartParseBaseline" class="btn btn-secondary btn-sm">Parse baseline</button>
+              <button id="smartUseCurrentBaseline" class="btn btn-secondary btn-sm">Use current as baseline</button>
+            </div>
+          </div>
+          <textarea
+            id="smartBaselineInput"
+            rows="3"
+            placeholder="Paste hex for baseline message…"
+            spellcheck="false"
+          ></textarea>
+          <div id="smartDiffResult" class="smart-diff-result"></div>
+        </div>
+      </section>
+
       <!-- Message Builder -->
       <section class="card builder-section">
         <div class="builder-header">

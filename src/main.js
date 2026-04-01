@@ -6,6 +6,7 @@ import { FIELD_DEFINITIONS } from './fieldDefinitions.js';
 import { NETWORK_PRESETS, validateMessageProfile, findPreset } from './networkProfiles.js';
 import { SAMPLE_HEX, buildSampleHex } from './sample.js';
 import { ENCODING_OPTIONS, encodingLabel, normalizeEncoding, textToHex, byteLength } from './encoding.js';
+import { initSmartEditor } from './smartEditor.js';
 
 const DEFAULT_ENCODING = 'ascii';
 
@@ -949,3 +950,4 @@ renderBuilderFields();
 refreshBuilderOutputs();
 renderHistory();
 hydrateFromSharedLink();
+initSmartEditor();
