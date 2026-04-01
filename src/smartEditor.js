@@ -99,6 +99,7 @@ export function initSmartEditor() {
     fields: {},
     mti: '0200',
   };
+  const scheduleRebuild = debounce((options = {}) => rebuildFromState(options), 120);
 
   populateEncodingSelect(encodingSelect);
   populateFieldSelect(fieldSelect);
@@ -206,7 +207,7 @@ export function initSmartEditor() {
     return parsed;
   }
 
-  function rebuildFromState() {
+  function rebuildFromState({ skipDiff = false } = {}) {
     const payload = { mti: state.mti || '0200', fields: {} };
     for (const [de, value] of Object.entries(state.fields || {})) {
       if (value == null || value === '') {
@@ -224,7 +225,7 @@ export function initSmartEditor() {
       if (skipHeader) skipHeader.checked = false;
       if (skipBytesInput) skipBytesInput.value = 0;
       const parsed = parseHex(hex, { skipBytes: 0, encoding });
-      if (parsed) renderDiff();
+      if (parsed && diffToggle?.checked && !skipDiff) renderDiff();
     } catch (err) {
       showError(err.message);
     }
@@ -334,7 +335,7 @@ export function initSmartEditor() {
 
   mtiInput?.addEventListener('input', () => {
     state.mti = mtiInput.value.trim();
-    rebuildFromState();
+    scheduleRebuild();
   });
 
   addFieldButton?.addEventListener('click', () => {
@@ -342,7 +343,7 @@ export function initSmartEditor() {
     if (!de) return;
     state.fields[de] = fieldValueInput?.value ?? '';
     fieldValueInput.value = '';
-    rebuildFromState();
+    scheduleRebuild();
   });
 
   fieldValueInput?.addEventListener('keydown', (e) => {
@@ -357,7 +358,7 @@ export function initSmartEditor() {
     if (!target.classList.contains('smart-value')) return;
     const de = Number(target.dataset.de);
     state.fields[de] = target.value;
-    rebuildFromState();
+    scheduleRebuild();
   });
 
   inspector?.addEventListener('click', (e) => {
@@ -365,7 +366,7 @@ export function initSmartEditor() {
     if (!btn) return;
     const de = Number(btn.dataset.de);
     delete state.fields[de];
-    rebuildFromState();
+    scheduleRebuild();
   });
 
   diffToggle?.addEventListener('change', () => {

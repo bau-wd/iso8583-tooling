@@ -6,15 +6,12 @@ A web-based DX tool for **parsing and visualizing ISO 8583:1993 messages** — b
 
 ## Features
 
-- 🛠 **Message Builder** — compose MTI + data elements visually and auto-generate hex/JSON
-- 🔍 **Parse** hex-encoded ISO 8583:1993 messages in the browser
-- 🗂 **Visualize** all data elements (DE1–DE128) in a structured, color-coded table
+- 🧠 **Smart Editor** — single surface to parse, edit, build, and diff ISO 8583 messages
+- ⚡️ **Live rebuilds** — MTI + field edits instantly recalc bitmaps and regenerate raw hex
+- 🔍 **Inline inspector** — view DE names, formats, lengths, values, and raw hex in one grid
+- 🧮 **Baseline diff** — toggle diff mode to compare against a pasted or current baseline
 - 🗺 **Bitmap decoding** — primary and secondary bitmaps parsed automatically
-- 📤 **Export to JSON** — download the parsed message as a `.json` file
-- 🧭 **Message history** — recent parses are stored locally and can be reloaded with one click
-- 🔗 **Shareable links** — share hex or JSON payloads via URL for easy collaboration
-- ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g. 2-byte or 4-byte length headers)
-- 🧭 **Field helper** — per-DE dropdown with format hints and live hex previews
+- ⚙️ **Skip length headers** — optionally skip N leading bytes (e.g., 2-byte or 4-byte headers)
 - 🌐 **Alternate encodings** — parse/build text fields as ASCII or EBCDIC (CP037)
 - 🧰 **CLI parity** — parse, export, and build messages from the terminal
 - 📦 **Zero backend** — runs entirely in the browser
@@ -78,17 +75,12 @@ Supported commands mirror the web UI features:
 
 ## How to Use
 
-1. *(Optional)* Use the **Message Builder**: choose MTI, add data elements, and click **Load Into Parser** to populate the parser input. Builder output respects the selected text encoding.
-2. Or **Paste** your hex-encoded ISO 8583 message into the textarea. *(Click **Load Sample** to use the built-in demo message.)*
-3. Choose the **text encoding** for MTI and text fields (ASCII by default; EBCDIC CP037 supported), and optionally check **Skip length header** to skip leading bytes (e.g. `2` for a 2-byte TPDU header).
-4. Click **Parse Message**. The tool displays:
-   - MTI badge
-   - Primary (and secondary) bitmap hex values
-   - Full field table with DE number, name, format, length type, length, decoded value, and raw hex
-5. Use the **Field Helper** panel to inspect any DE’s format/length rules and see a hex preview for the selected encoding.
-6. Click **Export JSON** to download the parsed result as a `.json` file.
-7. Use **Copy Hex Link** or **Copy JSON Link** to generate a shareable URL that preloads the message (encoding and skip options included).
-8. Recent messages appear in **History**; click **Load** to repopulate the input instantly.
+1. Paste or type a hex-encoded ISO 8583 message into the Smart Editor’s raw input. *(Click **Load Sample** to start from a demo message.)*
+2. Choose text encoding (ASCII default or EBCDIC CP037) and optionally enable **Skip length header** to ignore leading bytes.
+3. Click **Parse** or keep typing — the inspector will populate MTI, bitmaps, and all present data elements.
+4. Edit the MTI or any field value inline. The raw hex bar regenerates automatically with correct length prefixes and bitmaps.
+5. Add fields via the dropdown + **Add field**, or remove rows directly in the inspector to rebuild the message.
+6. Toggle **Diff mode** to compare against a baseline: paste a baseline hex (or reuse the current message) and click **Parse baseline** to see field-level differences.
 
 ---
 
