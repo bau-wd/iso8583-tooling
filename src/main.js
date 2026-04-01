@@ -47,6 +47,10 @@ const networkPresetSelect = document.getElementById('networkPreset');
 const profileBadge = document.getElementById('profileBadge');
 const profileStatus = document.getElementById('profileStatus');
 const encodingSelect = document.getElementById('encodingSelect');
+const inspectorRawInput = document.getElementById('inspectorRawInput');
+const inspectorErrorBox = document.getElementById('inspectorErrorBox');
+const inspectorGrid = document.getElementById('inspectorGrid');
+const inspectorStatus = document.getElementById('inspectorStatus');
 
 // Field helper refs
 const helperFieldSelect = document.getElementById('fieldSelect');
@@ -86,6 +90,8 @@ const builderState = { fields: {} };
 let lastParsed = null;
 let lastHexInput = '';
 let lastSkipBytes = 0;
+let inspectorParsed = null;
+let inspectorUpdatingFromGrid = false;
 
 // ── Encoding helpers ─────────────────────────────────────────────────────────
 function currentEncoding() {
@@ -303,6 +309,218 @@ function flashButton(btn, message, success = true) {
     btn.textContent = original;
     btn.disabled = false;
   }, 2000);
+}
+
+// ── Smart Inspector helpers ─────────────────────────────────────────────────
+function inspectorOptions() {
+  return {
+    skipBytes: skipHeader && skipBytes ? getSkipValue(skipHeader, skipBytes) : 0,
+    encoding: currentEncoding(),
+  };
+}
+
+function setInspectorStatus(state, count = 0) {
+  if (!inspectorStatus) return;
+  let label = 'Waiting for input';
+  let cls = 'badge badge-neutral';
+  if (state === 'pass') {
+    label = 'Live sync on';
+    cls = 'badge badge-pass';
+  } else if (state === 'warn') {
+    label = `${count} issue${count === 1 ? '' : 's'} detected`;
+    cls = 'badge badge-warn';
+  } else if (state === 'fail') {
+    label = 'Parse failed';
+    cls = 'badge badge-fail';
+  }
+  inspectorStatus.textContent = label;
+  inspectorStatus.className = cls;
+}
+
+function showInspectorError(messages = [], fatal = false) {
+  if (!inspectorErrorBox) return;
+  if (!messages.length) {
+    inspectorErrorBox.classList.add('hidden');
+    inspectorErrorBox.innerHTML = '';
+    inspectorRawInput?.classList.remove('input-error');
+    setInspectorStatus(inspectorParsed ? 'pass' : 'neutral');
+    return;
+  }
+
+  const prefix = fatal ? 'Fatal parse error' : 'Issues detected';
+  inspectorErrorBox.classList.remove('hidden');
+  inspectorErrorBox.innerHTML =
+    `<strong>⚠ ${prefix}:</strong><ul>` +
+    messages.map(e => `<li>${escapeHtml(e)}</li>`).join('') +
+    '</ul>';
+  inspectorRawInput?.classList.add('input-error');
+  setInspectorStatus(fatal ? 'fail' : 'warn', messages.length);
+}
+
+function inspectorRowClass(de) {
+  if (de >= 2 && de <= 14) return 'row-card';
+  if (de >= 35 && de <= 45) return 'row-auth';
+  if (de >= 48 && de <= 63) return 'row-private';
+  return '';
+}
+
+function renderInspectorGrid(parsed) {
+  if (!inspectorGrid) return;
+  if (!parsed) {
+    inspectorGrid.innerHTML = '<p class="muted inspector-empty">Paste a raw ISO 8583 message to populate the Smart Inspector grid.</p>';
+    return;
+  }
+
+  const { mti, primaryBitmap, secondaryBitmap, fields } = parsed;
+  const sortedDEs = Object.keys(fields || {}).map(Number).sort((a, b) => a - b);
+  const summary = `
+    <div class="inspector-summary">
+      <span><strong>MTI:</strong> <code>${escapeHtml(mti ?? '—')}</code></span>
+      <span><strong>Primary BMP:</strong> <code>${escapeHtml(primaryBitmap ?? '—')}</code></span>
+      <span><strong>Secondary BMP:</strong> <code>${escapeHtml(secondaryBitmap ?? '—')}</code></span>
+      <span><strong>Fields:</strong> ${sortedDEs.length}</span>
+    </div>
+  `;
+
+  const rows = [];
+  rows.push(`
+    <tr class="row-mti">
+      <td><span class="de-badge">MTI</span></td>
+      <td>Message Type Indicator</td>
+      <td>
+        <input class="smart-input" data-field="mti" value="${escapeHtml(mti ?? '')}" maxlength="4" spellcheck="false" />
+        <div class="smart-meta">Editable · 4 characters</div>
+      </td>
+      <td><code class="hex">${escapeHtml(mti ? textToHex(mti, currentEncoding()) : '')}</code></td>
+      <td><code>n</code> · fixed · 4</td>
+      <td></td>
+    </tr>
+  `);
+
+  rows.push(`
+    <tr class="row-bitmap">
+      <td><span class="de-badge">BMP1</span></td>
+      <td>Primary Bitmap</td>
+      <td><div class="smart-meta">Read-only</div></td>
+      <td><code class="hex">${escapeHtml(primaryBitmap ?? '—')}</code></td>
+      <td><code>b</code> · fixed · 8</td>
+      <td></td>
+    </tr>
+  `);
+
+  if (secondaryBitmap) {
+    rows.push(`
+      <tr class="row-bitmap">
+        <td><span class="de-badge">BMP2</span></td>
+        <td>Secondary Bitmap</td>
+        <td><div class="smart-meta">Read-only</div></td>
+        <td><code class="hex">${escapeHtml(secondaryBitmap)}</code></td>
+        <td><code>b</code> · fixed · 8</td>
+        <td></td>
+      </tr>
+    `);
+  }
+
+  if (sortedDEs.length === 0) {
+    rows.push('<tr><td colspan="6" class="empty">No data elements found in this message.</td></tr>');
+  } else {
+    for (const de of sortedDEs) {
+      const f = fields[de];
+      rows.push(`
+        <tr class="${inspectorRowClass(de)}">
+          <td><span class="de-badge">${escapeHtml(de)}</span></td>
+          <td>
+            <div>${escapeHtml(f.name)}</div>
+            <div class="smart-meta"><code>${escapeHtml(f.format)}</code> · ${escapeHtml(f.lengthType)} · ${escapeHtml(f.length)}</div>
+          </td>
+          <td>
+            <input
+              class="smart-input"
+              data-de="${escapeHtml(de)}"
+              value="${escapeHtml(f.value)}"
+              spellcheck="false"
+            />
+          </td>
+          <td><code class="hex">${escapeHtml(f.rawHex)}</code></td>
+          <td><code>${escapeHtml(f.format)}</code></td>
+          <td>
+            <label class="smart-toggle">
+              <input type="checkbox" class="smart-include" data-de="${escapeHtml(de)}" checked />
+              Include
+            </label>
+          </td>
+        </tr>
+      `);
+    }
+  }
+
+  inspectorGrid.innerHTML = `
+    ${summary}
+    <table class="smart-table field-table">
+      <thead>
+        <tr>
+          <th>DE #</th>
+          <th>Field</th>
+          <th>Value (editable)</th>
+          <th>Raw Hex</th>
+          <th>Format</th>
+          <th>Include</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join('')}</tbody>
+    </table>
+  `;
+}
+
+function parseInspectorRaw(raw) {
+  if (!inspectorRawInput || !inspectorGrid) return;
+  const value = (raw ?? '').trim();
+  if (!value) {
+    inspectorParsed = null;
+    renderInspectorGrid(null);
+    showInspectorError([]);
+    return;
+  }
+
+  try {
+    const parsed = parseISO8583(value, inspectorOptions());
+    inspectorParsed = parsed;
+    renderInspectorGrid(parsed);
+    showInspectorError(parsed.errors || []);
+  } catch (err) {
+    inspectorParsed = null;
+    renderInspectorGrid(null);
+    showInspectorError([err.message], true);
+  }
+}
+
+function handleInspectorGridChange() {
+  if (!inspectorGrid || !inspectorRawInput) return;
+
+  const mtiInput = inspectorGrid.querySelector('input[data-field="mti"]');
+  const payload = { mti: (mtiInput?.value || '').trim(), fields: {} };
+
+  inspectorGrid.querySelectorAll('input[data-de]').forEach((input) => {
+    const de = Number(input.dataset.de);
+    const includeToggle = inspectorGrid.querySelector(`input.smart-include[data-de="${de}"]`);
+    const include = includeToggle ? includeToggle.checked : true;
+    if (!include) return;
+    const val = input.value;
+    if (val != null && String(val).trim() !== '') {
+      payload.fields[de] = val;
+    }
+  });
+
+  try {
+    const hex = buildHexFromJSON(payload, inspectorOptions());
+    inspectorUpdatingFromGrid = true;
+    inspectorRawInput.value = hex;
+    parseInspectorRaw(hex);
+  } catch (err) {
+    showInspectorError([err.message], true);
+  } finally {
+    inspectorUpdatingFromGrid = false;
+  }
 }
 
 // ── Builder helpers ──────────────────────────────────────────────────────────
@@ -645,6 +863,7 @@ if (helperFieldSelect) helperFieldSelect.addEventListener('change', updateFieldH
 if (encodingSelect) encodingSelect.addEventListener('change', () => {
   updateFieldHelper();
   refreshBuilderOutputs();
+  parseInspectorRaw(inspectorRawInput?.value);
 });
 
 btnParse.addEventListener('click', () => {
@@ -679,6 +898,14 @@ btnParse.addEventListener('click', () => {
       btnParse.textContent = 'Parse Message';
     }
   }, 10);
+});
+
+skipHeader?.addEventListener('change', () => {
+  parseInspectorRaw(inspectorRawInput?.value);
+});
+
+skipBytes?.addEventListener('input', () => {
+  parseInspectorRaw(inspectorRawInput?.value);
 });
 
 if (networkPresetSelect) {
@@ -774,6 +1001,33 @@ historyList?.addEventListener('click', (e) => {
 btnClearHistory?.addEventListener('click', () => {
   clearHistory();
 });
+
+// ── Smart Inspector events ────────────────────────────────────────────────
+if (inspectorRawInput) {
+  inspectorRawInput.addEventListener('input', () => {
+    if (inspectorUpdatingFromGrid) return;
+    parseInspectorRaw(inspectorRawInput.value);
+  });
+  inspectorRawInput.addEventListener('paste', () => {
+    setTimeout(() => {
+      if (inspectorUpdatingFromGrid) return;
+      parseInspectorRaw(inspectorRawInput.value);
+    }, 0);
+  });
+}
+
+if (inspectorGrid) {
+  inspectorGrid.addEventListener('input', (e) => {
+    if (e.target.classList.contains('smart-input')) {
+      handleInspectorGridChange();
+    }
+  });
+  inspectorGrid.addEventListener('change', (e) => {
+    if (e.target.classList.contains('smart-include')) {
+      handleInspectorGridChange();
+    }
+  });
+}
 
 // ── Compare & Diff events ─────────────────────────────────────────────────────
 if (btnCompare) {

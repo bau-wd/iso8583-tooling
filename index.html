@@ -173,6 +173,33 @@
         <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" />
       </section>
 
+      <!-- Smart Inspector -->
+      <section class="card inspector-section">
+        <div class="inspector-header">
+          <div>
+            <h2>Smart Inspector</h2>
+            <p class="helper-text">Live parsing grid that stays in sync with the raw hex input. Uses the encoding and skip header options above.</p>
+          </div>
+          <div class="inspector-status">
+            <span id="inspectorStatus" class="badge badge-neutral">Waiting for input</span>
+          </div>
+        </div>
+
+        <label for="inspectorRawInput">Raw Input</label>
+        <textarea
+          id="inspectorRawInput"
+          placeholder="Paste or type raw ISO 8583 hex… parsing happens instantly."
+          rows="4"
+          spellcheck="false"
+        ></textarea>
+        <p class="helper-text small">Inline errors are shown below. Editing the grid will rewrite this raw string.</p>
+
+        <div id="inspectorErrorBox" class="error-banner hidden"></div>
+        <div id="inspectorGrid" class="inspector-grid">
+          <p class="muted inspector-empty">Paste a raw ISO 8583 message to populate the Smart Inspector grid.</p>
+        </div>
+      </section>
+
       <!-- Field Helper -->
       <section class="card helper-section">
         <div class="helper-header">
